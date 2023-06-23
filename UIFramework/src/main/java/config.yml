@@ -1,0 +1,14 @@
+general:
+    # The max length of characters in a line item lore can have (to keep text on screen)
+    lore_line_length: 60
+    # If disabled server operators will not recieve cooldowns
+    give_op_cooldowns: true
+    # If disabled players in creative or spectator will not recieve cooldowns
+    give_immune_cooldowns: true
+messages:
+    # Message displayed to non player entities who run player only commands
+    console_error_message: "&cUnable to execute command from console!"
+    # Message displayed to those who try to run a command but do not have permission to
+    permission_error: "&cYou do not have permission to use that!"
+    # Message displayed to players who try to activate abilities that are on cooldown
+    abilityCooldown: "&cYou cannot use %ability% &cfor another &e%cooldown% &cseconds!"
