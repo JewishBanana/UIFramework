@@ -64,9 +64,8 @@ public class ItemBuilder {
 				lore.add(UIFUtils.convertString("&7"+UIFDataUtils.capitalizeFormat(k.getKey().getKey())+' '+UIFUtils.getNumerical(v)));
 			});
 		}
-		// elemental lore
-		lore.add(" ");
 		if (id.getDamage() > 0.0 || id.getAttackSpeed() > 0.0) {
+			lore.add(" ");
 			tempMeta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
 			lore.add(UIFUtils.convertString(UIFramework.getLangString("attributes.main_hand_lore")));
 			if (id.getDamage() == 0.0)

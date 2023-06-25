@@ -24,7 +24,11 @@ import com.jewishbanana.uiframework.utils.UIFUtils;
 
 public class UICommand implements CommandExecutor,TabCompleter {
 	
+	private UIFramework plugin;
+	
 	public UICommand(UIFramework plugin) {
+		this.plugin = plugin;
+		
 		plugin.getCommand("uiframework").setExecutor(this);
 	}
 	@Override
@@ -76,7 +80,7 @@ public class UICommand implements CommandExecutor,TabCompleter {
 				sender.sendMessage(UIFUtils.convertString(UIFDataUtils.getConfigString("messages.permission_error")));
 				return true;
 			}
-			UIFramework.reload();
+			plugin.reload();
 			sender.sendMessage(UIFUtils.convertString(UIFUtils.prefix+"&aSuccessfully reloaded the config!"));
 			return true;
 		case "recipes":

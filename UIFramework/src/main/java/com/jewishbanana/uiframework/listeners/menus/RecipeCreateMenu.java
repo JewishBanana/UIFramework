@@ -116,7 +116,7 @@ public class RecipeCreateMenu extends InventoryHandler {
 						for (int j=0; j < 3; j++) {
 							int slot = ((i+1)*9)+j+1;
 							ItemStack item = this.getInventory().getItem(slot);
-							if (item == null)
+							if (item == null || item.getType() == Material.AIR)
 								shape[i] += ' ';
 							else {
 								char c = Character.forDigit((i*3)+j, 10);
@@ -158,7 +158,7 @@ public class RecipeCreateMenu extends InventoryHandler {
 	}
 	public void onClick(InventoryClickEvent event) {
 		int slot = event.getRawSlot();
-		if (slot > 53 && event.getClick() != ClickType.SHIFT_LEFT || event.getClick() != ClickType.SHIFT_RIGHT)
+		if (slot > 53 && !(event.getClick() == ClickType.SHIFT_LEFT || event.getClick() == ClickType.SHIFT_RIGHT))
 			return;
 		event.setCancelled(true);
 		InventoryButton button = buttons.get(slot);

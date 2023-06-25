@@ -31,7 +31,7 @@ public class UIFramework extends JavaPlugin {
 	public double mcVersion;
 	public static YamlConfiguration langFile, defaultLang, dataFile;
 	public FixedMetadataValue fixedData;
-	private static List<Runnable> reloadRunnables = new ArrayList<>();
+	private List<Runnable> reloadRunnables = new ArrayList<>();
 	
 	public void onEnable() {
 		instance = this;
@@ -101,8 +101,8 @@ public class UIFramework extends JavaPlugin {
 		if (new File(getDataFolder().getAbsolutePath(), "data.yml").exists())
 			saveDataFile();
 	}
-	public static void reload() {
-		instance.reloadConfig();
+	public void reload() {
+		reloadConfig();
 		Ability.pluginReload();
 		reloadRunnables.forEach(k -> k.run());
 	}
@@ -125,7 +125,7 @@ public class UIFramework extends JavaPlugin {
 	public static UIFramework getInstance() {
 		return instance;
 	}
-	public static void registerReloadRunnable(Runnable runnable) {
+	public void registerReloadRunnable(Runnable runnable) {
 		reloadRunnables.add(runnable);
 	}
 }

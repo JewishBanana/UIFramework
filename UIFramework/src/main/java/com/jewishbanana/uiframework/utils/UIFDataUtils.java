@@ -1,13 +1,8 @@
 package com.jewishbanana.uiframework.utils;
 
 import java.text.DecimalFormat;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
 import java.util.stream.Collectors;
 
 import org.bukkit.Keyed;
@@ -32,22 +27,6 @@ public class UIFDataUtils {
 		decimalFormat = new DecimalFormat("0.#");
 	}
 	
-	public static <K, V extends Comparable<? super V>> Map<K, V> sortByValue(Map<K, V> map) {
-        List<Entry<K, V>> list = new ArrayList<>(map.entrySet());
-        list.sort(Entry.comparingByValue());
-        Map<K, V> result = new LinkedHashMap<>();
-        for (Entry<K, V> entry : list)
-            result.put(entry.getKey(), entry.getValue());
-        return result;
-    }
-	public static <K, V> Map<K, V> reverseMap(Map<K, V> map) {
-		List<Entry<K, V>> list = new ArrayList<>(map.entrySet());
-		Collections.reverse(list);
-		Map<K, V> newMap = new LinkedHashMap<>();
-		for (Entry<K, V> entry : list)
-			newMap.put(entry.getKey(), entry.getValue());
-		return newMap;
-	}
 	public static int getConfigInt(String path) {
 		try {
 			return plugin.getConfig().getInt(path);

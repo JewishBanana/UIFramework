@@ -19,6 +19,7 @@ import org.bukkit.event.Event;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityShootBowEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
+import org.bukkit.event.entity.ProjectileLaunchEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.Recipe;
@@ -55,9 +56,10 @@ public class ItemType {
 	public Map<Ability.Action, Queue<Ability>> abilityMap = new HashMap<>();
 	public List<Recipe> recipes = new ArrayList<>();
 	
-	private ItemType(Class<? extends GenericItem> instance, int ID) {
+	private ItemType(Class<? extends GenericItem> instance, int ID, String registeredName) {
 		this.instance = instance;
 		this.ID = ID;
+		this.registeredName = registeredName;
 		
 		try {
 			this.item = instance.getDeclaredConstructor(ItemStack.class).newInstance(new ItemStack(Material.AIR)).setId(this).createItem().attachID(ID).build();
@@ -75,9 +77,8 @@ public class ItemType {
 			if (registeredIdList.contains(id)) {
 				for (int i=0; i < 999999; i++)
 					if (!registeredIdList.contains(i)) {
-						type = new ItemType(instance, i);
+						type = new ItemType(instance, i, name);
 						type.dataPath = "item."+name;
-						type.registeredName = name;
 						itemsMap.put(name, type);
 						registeredIdList.add(i);
 						UIFramework.dataFile.set("item."+name+".id", i);
@@ -87,18 +88,16 @@ public class ItemType {
 				UIFramework.consoleSender.sendMessage(UIFUtils.convertString(UIFUtils.prefix+"&cERROR while registering item &e'"+name+"' &can item with that ID already exists! Rebounding the items ID to "+id+". All currently existing instances of this item will no longer work."));
 				return type;
 			}
-			type = new ItemType(instance, id);
+			type = new ItemType(instance, id, name);
 			type.dataPath = "item."+name;
-			type.registeredName = name;
 			itemsMap.put(name, type);
 			registeredIdList.add(id);
 			return type;
 		}
 		for (int i=0; i < 999999; i++)
 			if (!registeredIdList.contains(i) && !preIdList.contains(i)) {
-				ItemType type = new ItemType(instance, i);
+				ItemType type = new ItemType(instance, i, name);
 				type.dataPath = "item."+name;
-				type.registeredName = name;
 				itemsMap.put(name, type);
 				registeredIdList.add(i);
 				UIFramework.dataFile.createSection("item."+name);
@@ -111,7 +110,7 @@ public class ItemType {
 		for (String s : UIFramework.dataFile.getConfigurationSection("item").getKeys(false))
 			if (UIFramework.dataFile.contains("item."+s+".recipes"))
 				for (String path : UIFramework.dataFile.getConfigurationSection("item."+s+".recipes").getKeys(false))
-					recipeNames.put(path, Pair.of(s, UIFramework.dataFile.getConfigurationSection("item.recipes."+path)));
+					recipeNames.put(path, Pair.of(s, UIFramework.dataFile.getConfigurationSection("item."+s+".recipes."+path)));
 		plugin.getServer().getScheduler().runTaskLater(plugin, () -> recipeNames.forEach((k, v) -> {
 			ItemType type = getItemType(v.getFirst());
 			if (type != null)
@@ -119,10 +118,15 @@ public class ItemType {
 		}), 1);
 	}
 	public static void registerRecipe(ItemType type, ShapedRecipe recipe) {
-		addRecipe(type, new ShapedRecipe(new NamespacedKey(plugin, recipe.getKey().getKey()), recipe.getResult()));
+		ShapedRecipe shapedRecipe = new ShapedRecipe(new NamespacedKey(plugin, recipe.getKey().getKey()), recipe.getResult());
+		shapedRecipe.shape(recipe.getShape());
+		recipe.getChoiceMap().forEach((k, v) -> shapedRecipe.setIngredient(k, v));
+		addRecipe(type, shapedRecipe);
 	}
 	public static void registerRecipe(ItemType type, ShapelessRecipe recipe) {
-		addRecipe(type, new ShapelessRecipe(new NamespacedKey(plugin, recipe.getKey().getKey()), recipe.getResult()));
+		ShapelessRecipe shapelessRecipe = new ShapelessRecipe(new NamespacedKey(plugin, recipe.getKey().getKey()), recipe.getResult());
+		recipe.getChoiceList().forEach(k -> shapelessRecipe.addIngredient(k));
+		addRecipe(type, shapelessRecipe);
 	}
 	private static <T extends Recipe & Keyed> void addRecipe(ItemType type, T recipe) {
 		if (!itemsMap.containsValue(type))
@@ -169,6 +173,9 @@ public class ItemType {
 						ability.hitEntity((EntityDamageByEntityEvent) event, base);
 					else
 						ability.wasHit((EntityDamageByEntityEvent) event, base);
+			else if (event instanceof ProjectileLaunchEvent)
+				for (Ability ability : abilityMap.get(action))
+					ability.projectileThrown((ProjectileLaunchEvent) event, base);
 			else if (event instanceof ProjectileHitEvent)
 				for (Ability ability : abilityMap.get(action))
 					ability.projectileHit((ProjectileHitEvent) event, base);

@@ -4,9 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
-import org.bukkit.Bukkit;
 import org.bukkit.entity.LivingEntity;
-import org.bukkit.entity.Player;
 import org.bukkit.entity.ThrowableProjectile;
 import org.bukkit.event.Event.Result;
 import org.bukkit.event.EventHandler;
@@ -15,6 +13,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityShootBowEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
+import org.bukkit.event.entity.ProjectileLaunchEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemStack;
 
@@ -68,8 +67,17 @@ public class AbilityListener implements Listener {
 			if (base != null)
 				base.hitEntity(e);
 		}
-		if (e.getDamager() instanceof Player)
-			Bukkit.broadcastMessage("d "+e.getDamage()+" "+((Math.pow(((((Player) e.getDamager()).getAttackCooldown() * 12.0) + 0.5) / (1.0 / 1.6 * 20), 2.0) * 0.8 + 0.2) * 7.0)+" "+((Player) e.getDamager()).getAttackCooldown());
+	}
+	@EventHandler(priority = EventPriority.HIGH)
+	public void onProjectileThrown(ProjectileLaunchEvent e) {
+		if (e.isCancelled())
+			return;
+		if (e.getEntity() instanceof ThrowableProjectile) {
+			ItemStack item = ((ThrowableProjectile) e.getEntity()).getItem();
+			GenericItem base = GenericItem.getItemBase(item);
+			if (base != null)
+				base.projectileThrown(e);
+		}
 	}
 	@EventHandler(priority = EventPriority.HIGH)
 	public void onProjectileHit(ProjectileHitEvent e) {

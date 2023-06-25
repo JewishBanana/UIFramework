@@ -64,7 +64,7 @@ public class ItemsMenu extends InventoryHandler {
 	}
 	public void onClick(InventoryClickEvent event) {
 		int slot = event.getRawSlot();
-		if (slot > 53 && event.getClick() != ClickType.SHIFT_LEFT || event.getClick() != ClickType.SHIFT_RIGHT)
+		if (slot > 53 && !(event.getClick() == ClickType.SHIFT_LEFT || event.getClick() == ClickType.SHIFT_RIGHT))
 			return;
 		event.setCancelled(true);
 		InventoryButton button = buttons.get(slot);

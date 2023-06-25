@@ -9,6 +9,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityShootBowEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
+import org.bukkit.event.entity.ProjectileLaunchEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 
 import com.jewishbanana.uiframework.UIFramework;
@@ -44,6 +45,9 @@ public class Ability {
 		return false;
 	}
 	public boolean wasHit(EntityDamageByEntityEvent event, GenericItem base) {
+		return false;
+	}
+	public boolean projectileThrown(ProjectileLaunchEvent event, GenericItem base) {
 		return false;
 	}
 	public boolean projectileHit(ProjectileHitEvent event, GenericItem base) {
@@ -84,6 +88,7 @@ public class Ability {
 		
 		HIT_ENTITY("action.passive"),
 		WAS_HIT("action.passive"),
+		WAS_THROWN("action.passive"),
 		PROJECTILE_HIT("action.passive"),
 		SHOT_BOW("action.passive");
 		

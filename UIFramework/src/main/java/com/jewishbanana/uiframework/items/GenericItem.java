@@ -11,6 +11,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityShootBowEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
+import org.bukkit.event.entity.ProjectileLaunchEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
@@ -61,6 +62,8 @@ public abstract class GenericItem {
 	}
 	public void hitEntity(EntityDamageByEntityEvent event) {
 		double damage = id.getDamage();
+		if (event.getDamager() instanceof Player)
+			damage = ((Math.pow(((((Player) event.getDamager()).getAttackCooldown() * 12.0) + 0.5) / (1.0 / 1.6 * 20), 2.0) * 0.8 + 0.2) * id.getDamage());
 		if (event.getDamager() instanceof LivingEntity) {
 			LivingEntity entity = (LivingEntity) event.getDamager();
 			if (entity.hasPotionEffect(PotionEffectType.INCREASE_DAMAGE))
@@ -75,6 +78,9 @@ public abstract class GenericItem {
 	}
 	public void wasHit(EntityDamageByEntityEvent event) {
 		id.simulateAction(Action.WAS_HIT, event, this);
+	}
+	public void projectileThrown(ProjectileLaunchEvent event) {
+		id.simulateAction(Action.WAS_THROWN, event, this);
 	}
 	public void projectileHit(ProjectileHitEvent event) {
 		id.simulateAction(Action.PROJECTILE_HIT, event, this);
