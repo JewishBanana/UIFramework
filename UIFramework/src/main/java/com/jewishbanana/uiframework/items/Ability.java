@@ -34,7 +34,7 @@ public class Ability {
 						.replace("%ability%", type.getName())));
 			return false;
 		} else {
-			type.putEntityOnCooldown(entity.getUniqueId(), cooldownTicks);
+			type.putEntityOnCooldown(entity.getUniqueId(), getCooldownTicks());
 			return true;
 		}
 	}
