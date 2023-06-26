@@ -62,16 +62,19 @@ public abstract class GenericItem {
 	}
 	public void hitEntity(EntityDamageByEntityEvent event) {
 		double damage = id.getDamage();
-		if (event.getDamager() instanceof Player)
-			damage = ((Math.pow(((((Player) event.getDamager()).getAttackCooldown() * 12.0) + 0.5) / (1.0 / 1.6 * 20), 2.0) * 0.8 + 0.2) * id.getDamage());
 		if (event.getDamager() instanceof LivingEntity) {
 			LivingEntity entity = (LivingEntity) event.getDamager();
+			double enchantDamage = UIFUtils.getEnchantDamage(item, (event.getEntity() instanceof LivingEntity ? (LivingEntity) event.getEntity() : null));
 			if (entity.hasPotionEffect(PotionEffectType.INCREASE_DAMAGE))
 				damage += entity.getPotionEffect(PotionEffectType.INCREASE_DAMAGE).getAmplifier() * 3.0;
+			if (event.getDamager() instanceof Player) {
+				double cooldown = ((Player) event.getDamager()).getAttackCooldown();
+				damage *= 0.2 + ((cooldown * cooldown) * 0.8);
+				damage += (enchantDamage * cooldown);
+			}
 			if (event.getEntity() instanceof LivingEntity && entity.getFallDistance() > 0.0 && !entity.isOnGround() && !entity.isClimbing() && !entity.isInWater() && !entity.hasPotionEffect(PotionEffectType.BLINDNESS) && !entity.hasPotionEffect(PotionEffectType.SLOW_FALLING)
 					&& !entity.isInsideVehicle() && !(entity instanceof Player && (((Player) entity).isSprinting() || ((Player) entity).getAttackCooldown() < 0.9)))
 				damage *= 1.5;
-			damage += UIFUtils.getEnchantDamage(item, (event.getEntity() instanceof LivingEntity ? (LivingEntity) event.getEntity() : null));
 		}
 		event.setDamage(damage);
 		id.simulateAction(Action.HIT_ENTITY, event, this);

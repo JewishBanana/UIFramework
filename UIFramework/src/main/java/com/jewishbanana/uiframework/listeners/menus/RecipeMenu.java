@@ -20,22 +20,25 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.Recipe;
 import org.bukkit.inventory.RecipeChoice;
 import org.bukkit.inventory.RecipeChoice.ExactChoice;
+import org.bukkit.inventory.ShapedRecipe;
+import org.bukkit.inventory.ShapelessRecipe;
+import org.bukkit.scheduler.BukkitTask;
 
 import com.jewishbanana.uiframework.UIFramework;
 import com.jewishbanana.uiframework.items.ItemType;
 import com.jewishbanana.uiframework.utils.ItemBuilder;
-import com.jewishbanana.uiframework.utils.RepeatingTask;
 import com.jewishbanana.uiframework.utils.UIFUtils;
-
-import org.bukkit.inventory.ShapedRecipe;
-import org.bukkit.inventory.ShapelessRecipe;
 
 public class RecipeMenu extends InventoryHandler {
 
+	private static UIFramework plugin;
+	static {
+		plugin = UIFramework.getInstance();
+	}
 	private ItemType type;
 	public int page, memoryPage;
 	private Map<Integer, Queue<ItemStack>> choiceMap = new HashMap<>();
-	private RepeatingTask task;
+	private BukkitTask task;
 	public boolean adminControls;
 	
 	public RecipeMenu(ItemType type, int page, int memoryPage, boolean adminControls) {
@@ -175,23 +178,20 @@ public class RecipeMenu extends InventoryHandler {
 	}
 	public void onOpen(InventoryOpenEvent e) {
 		if (!choiceMap.isEmpty())
-			task = new RepeatingTask(0, 20) {
-				@Override
-				public void run() {
-					choiceMap.forEach((k, v) -> {
-						ItemStack item = getInventory().getItem(k);
-						Iterator<ItemStack> it = v.iterator();
-						while (it.hasNext())
-							if (it.next().equals(item)) {
-								if (it.hasNext())
-									getInventory().setItem(k, it.next());
-								else
-									getInventory().setItem(k, v.peek());
-								break;
-							}
-					});
-				}
-			};
+			task = plugin.getServer().getScheduler().runTaskTimer(plugin, () -> {
+				choiceMap.forEach((k, v) -> {
+					ItemStack item = getInventory().getItem(k);
+					Iterator<ItemStack> it = v.iterator();
+					while (it.hasNext())
+						if (it.next().equals(item)) {
+							if (it.hasNext())
+								getInventory().setItem(k, it.next());
+							else
+								getInventory().setItem(k, v.peek());
+							break;
+						}
+				});
+			}, 0, 20);
 	}
 	public void onClose(InventoryCloseEvent e) {
 		if (task != null)

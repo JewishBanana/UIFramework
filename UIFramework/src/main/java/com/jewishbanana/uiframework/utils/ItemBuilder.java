@@ -8,6 +8,7 @@ import org.bukkit.Material;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.attribute.AttributeModifier.Operation;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
@@ -70,7 +71,10 @@ public class ItemBuilder {
 			lore.add(UIFUtils.convertString(UIFramework.getLangString("attributes.main_hand_lore")));
 			if (id.getDamage() == 0.0)
 				id.setDamage(1.0);
-			lore.add(UIFUtils.convertString(UIFramework.getLangString("attributes.attack_damage").replaceAll("%damage%", UIFDataUtils.getDecimalFormatted(id.getDamage()))));
+			double damage = id.getDamage();
+			if (tempMeta.hasEnchant(Enchantment.DAMAGE_ALL))
+				damage += 0.5 * (tempMeta.getEnchantLevel(Enchantment.DAMAGE_ALL) - 1) + 1.0;
+			lore.add(UIFUtils.convertString(UIFramework.getLangString("attributes.attack_damage").replaceAll("%damage%", UIFDataUtils.getDecimalFormatted(damage))));
 			if (id.getAttackSpeed() == 0.0)
 				id.setAttackSpeed(1.0);
 			lore.add(UIFUtils.convertString(UIFramework.getLangString("attributes.attack_speed").replaceAll("%attackSpeed%", UIFDataUtils.getDecimalFormatted(id.getAttackSpeed()))));
