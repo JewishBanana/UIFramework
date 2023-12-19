@@ -2,8 +2,8 @@
 
 /.settings/
 
-/.metadata/
-
 .classpath
 
 .project
+
+dependency-reduced-pom.xml
