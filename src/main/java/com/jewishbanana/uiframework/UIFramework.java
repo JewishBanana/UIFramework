@@ -66,10 +66,10 @@ public class UIFramework extends JavaPlugin {
 			}
 		} else
 			langFile = YamlConfiguration.loadConfiguration(langLocation);
-		if (!langFile.contains("data.version") || langFile.getDouble("data.version") < Double.parseDouble(this.getDescription().getVersion())) {
+		if (!langFile.contains("data.version") || !langFile.getString("data.version").equals(this.getDescription().getVersion())) {
 			try {
 				ConfigUpdater.update(this, getResource("files/language.yml"), langLocation, null);
-				langFile.set("data.version", Double.parseDouble(this.getDescription().getVersion()));
+				langFile.set("data.version", this.getDescription().getVersion());
 				langFile.save(langLocation);
 				ConfigUpdater.update(this, getResource("config.yml"), new File(getDataFolder().getAbsolutePath(), "config.yml"), null);
 				this.reloadConfig();

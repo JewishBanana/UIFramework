@@ -2,15 +2,22 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.jewishbanana</groupId>
 	<artifactId>uiframework</artifactId>
-	<version>1.0</version>
+	<version>2.0.1-SNAPSHOT</version>
 	<name>UIFramework</name>
+	
+	<properties>
+		<maven.compiler.source>1.8</maven.compiler.source>
+		<maven.compiler.target>1.8</maven.compiler.target>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<mainClass>com.jewishbanana.uiframework.UIFramework</mainClass>
+	</properties>
 
 	<build>
 		<plugins>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-shade-plugin</artifactId>
-				<version>3.3.0</version>
+				<version>3.2.4</version>
 				<executions>
 					<execution>
 						<phase>package</phase>
