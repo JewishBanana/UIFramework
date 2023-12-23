@@ -44,8 +44,8 @@ public class ConfigUpdater {
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         resourceName.transferTo(baos);
-        InputStream firstClone = new ByteArrayInputStream(baos.toByteArray()); 
-        InputStream secondClone = new ByteArrayInputStream(baos.toByteArray()); 
+        InputStream firstClone = new ByteArrayInputStream(baos.toByteArray());
+        InputStream secondClone = new ByteArrayInputStream(baos.toByteArray());
         
         FileConfiguration defaultConfig = YamlConfiguration.loadConfiguration(new InputStreamReader(firstClone, StandardCharsets.UTF_8));
         FileConfiguration currentConfig = YamlConfiguration.loadConfiguration(new InputStreamReader(FileUtils.openInputStream(toUpdate), StandardCharsets.UTF_8));
