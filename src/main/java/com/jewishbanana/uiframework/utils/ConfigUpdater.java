@@ -9,6 +9,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -17,6 +18,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import org.apache.commons.io.FileUtils;
 import org.bukkit.configuration.ConfigurationSection;
@@ -43,7 +45,7 @@ public class ConfigUpdater {
         Preconditions.checkArgument(toUpdate.exists(), "The toUpdate file doesn't exist!");
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        resourceName.transferTo(baos);
+        transferTo(baos, resourceName);
         InputStream firstClone = new ByteArrayInputStream(baos.toByteArray());
         InputStream secondClone = new ByteArrayInputStream(baos.toByteArray());
         
@@ -241,5 +243,40 @@ public class ConfigUpdater {
         if (comment != null)
             //Replaces all '\n' with '\n' + indents except for the last one
             writer.write(indents + comment.substring(0, comment.length() - 1).replace("\n", "\n" + indents) + "\n");
+    }
+    public static int readInternal(byte b[], int off, int len, InputStream stream) throws IOException {
+        if (len == 0) {
+            return 0;
+        }
+
+        int c = stream.read();
+        if (c == -1) {
+            return -1;
+        }
+        b[off] = (byte)c;
+
+        int i = 1;
+        try {
+            for (; i < len ; i++) {
+                c = stream.read();
+                if (c == -1) {
+                    break;
+                }
+                b[off + i] = (byte)c;
+            }
+        } catch (IOException ee) {
+        }
+        return i;
+    }
+    public static long transferTo(OutputStream out, InputStream input) throws IOException {
+        Objects.requireNonNull(out, "out");
+        long transferred = 0;
+        byte[] buffer = new byte[8192];
+        int read;
+        while ((read = readInternal(buffer, 0, 8192, input)) >= 0) {
+            out.write(buffer, 0, read);
+            transferred += read;
+        }
+        return transferred;
     }
 }
