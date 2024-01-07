@@ -127,7 +127,7 @@ public class RecipeCreateMenu extends InventoryHandler {
 					if (!choiceMap.isEmpty()) {
 						shapedRecipe.shape(shape);
 						choiceMap.forEach((k, v) -> shapedRecipe.setIngredient(k, v));
-						ItemType.registerRecipe(type, shapedRecipe);
+						type.registerRecipe(shapedRecipe);
 						RecipeMenu menu = new RecipeMenu(type, type.recipes.size(), returnRecipeMenu.returnMenu.memoryPage, returnRecipeMenu.returnMenu.adminControls);
 						MenuManager.registerInventory(menu.getInventory(), menu);
 						event.getWhoClicked().openInventory(menu.getInventory());
@@ -143,7 +143,7 @@ public class RecipeCreateMenu extends InventoryHandler {
 								shapedRecipe.addIngredient(new RecipeChoice.ExactChoice(item));
 						}
 					if (!shapedRecipe.getChoiceList().isEmpty()) {
-						ItemType.registerRecipe(type, shapedRecipe);
+						type.registerRecipe(shapedRecipe);
 						RecipeMenu menu = new RecipeMenu(type, type.recipes.size(), returnRecipeMenu.returnMenu.memoryPage, returnRecipeMenu.returnMenu.adminControls);
 						MenuManager.registerInventory(menu.getInventory(), menu);
 						event.getWhoClicked().openInventory(menu.getInventory());

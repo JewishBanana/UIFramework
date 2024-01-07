@@ -11,6 +11,8 @@ action:
     inventory_click: "&b[Inventory-Click]"
     consume: "&b[Consume]"
     interact_entity: "&b[Interact-Entity]"
+    drop_item: "&b[Drop-Item]"
+    pickup_item: "&b[Pickup-Item]"
     passive: "&a[Passive]"
 # Attribute info on custom items that use different modifiers
 attributes:

@@ -3,8 +3,8 @@ package com.jewishbanana.uiframework;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
 import org.bukkit.Bukkit;
@@ -33,7 +33,7 @@ public class UIFramework extends JavaPlugin {
 	public double mcVersion;
 	public static YamlConfiguration langFile, defaultLang, dataFile;
 	public FixedMetadataValue fixedData;
-	private List<Runnable> reloadRunnables = new ArrayList<>();
+	private Map<JavaPlugin, Runnable> reloadRunnables = new HashMap<>();
 	
 	public void onEnable() {
 		instance = this;
@@ -109,12 +109,12 @@ public class UIFramework extends JavaPlugin {
 	public void reload() {
 		reloadConfig();
 		Ability.pluginReload();
-		reloadRunnables.forEach(k -> {
+		reloadRunnables.forEach((k, v) -> {
 			try {
-				k.run();
+				v.run();
 			} catch (Exception e) {
 				e.printStackTrace();
-				consoleSender.sendMessage(UIFUtils.convertString("&e[UIFramework]: An error has occurred with a plugin trying to reload with UIFramework! This is NOT a UIFramework bug! Report this to the proper plugin author."));
+				consoleSender.sendMessage(UIFUtils.convertString("&e[UIFramework]: An error has occurred while &d"+k.getName()+" &etried to reload with UIFramework! This is NOT a UIFramework bug! Report this to the proper plugin author(s): "+k.getDescription().getAuthors().toString()));
 			}
 		});
 	}
@@ -137,7 +137,7 @@ public class UIFramework extends JavaPlugin {
 	public static UIFramework getInstance() {
 		return instance;
 	}
-	public void registerReloadRunnable(Runnable runnable) {
-		reloadRunnables.add(runnable);
+	public void registerReloadRunnable(JavaPlugin plugin, Runnable runnable) {
+		reloadRunnables.put(plugin, runnable);
 	}
 }

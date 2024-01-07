@@ -24,6 +24,7 @@ import org.bukkit.event.inventory.PrepareItemCraftEvent;
 import org.bukkit.event.inventory.PrepareSmithingEvent;
 import org.bukkit.event.player.PlayerItemBreakEvent;
 import org.bukkit.event.player.PlayerItemDamageEvent;
+import org.bukkit.event.player.PlayerItemMendEvent;
 import org.bukkit.inventory.AnvilInventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.Damageable;
@@ -117,7 +118,36 @@ public class ItemListener implements Listener {
 			durabilityMap.put(e.getItem(), damage);
 		}
 	}
-	@EventHandler
+	@EventHandler(priority = EventPriority.HIGH)
+	public void onItemMend(PlayerItemMendEvent e) {
+		if (e.isCancelled())
+			return;
+		GenericItem item = GenericItem.getItemBase(e.getItem());
+		if (item != null) {
+			e.setCancelled(true);
+			double damage = (durabilityMap.containsKey(e.getItem()) ? durabilityMap.get(e.getItem()) : 0.0) - ((((double) e.getItem().getType().getMaxDurability()) / item.getId().getDurability()) * ((double) e.getRepairAmount()));
+			int realDamage = 0;
+			if (damage < 0.0) {
+				while (damage < 0.0) {
+					realDamage++;
+					damage += 1.0;
+				}
+				Damageable meta = (Damageable) e.getItem().getItemMeta();
+				if (meta.getDamage()-realDamage < 0) {
+					meta.setDamage(0);
+					e.getItem().setItemMeta((ItemMeta) meta);
+					item.setItem(e.getItem());
+					durabilityMap.put(e.getItem(), 0.0);
+					return;
+				}
+				meta.setDamage(meta.getDamage()-realDamage);
+				e.getItem().setItemMeta((ItemMeta) meta);
+				item.setItem(e.getItem());
+			}
+			durabilityMap.put(e.getItem(), damage);
+		}
+	}
+	@EventHandler(priority = EventPriority.MONITOR)
 	public void onItemBreak(PlayerItemBreakEvent e) {
 		GenericItem.removeBaseItem(e.getBrokenItem());
 		durabilityMap.remove(e.getBrokenItem());

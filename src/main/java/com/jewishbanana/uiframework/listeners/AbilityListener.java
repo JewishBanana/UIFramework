@@ -5,12 +5,16 @@ import java.util.Map;
 import java.util.UUID;
 
 import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Player;
 import org.bukkit.entity.ThrowableProjectile;
 import org.bukkit.event.Event.Result;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.entity.EntityDeathEvent;
+import org.bukkit.event.entity.EntityDropItemEvent;
+import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.entity.EntityShootBowEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.event.entity.ProjectileLaunchEvent;
@@ -18,6 +22,7 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerItemConsumeEvent;
+import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.inventory.ItemStack;
 
 import com.jewishbanana.uiframework.UIFramework;
@@ -69,6 +74,12 @@ public class AbilityListener implements Listener {
 			base = GenericItem.getItemBase(entity.getEquipment().getItemInOffHand());
 			if (base != null)
 				base.wasHit(e);
+			if (entity instanceof Player)
+				for (ItemStack item : ((Player) entity).getInventory().getStorageContents()) {
+					base = GenericItem.getItemBase(item);
+					if (base != null)
+						base.wasHit(e);
+				}
 		}
 		if (e.getDamager() instanceof LivingEntity) {
 			LivingEntity entity = (LivingEntity) e.getDamager();
@@ -83,6 +94,12 @@ public class AbilityListener implements Listener {
 			base = GenericItem.getItemBase(entity.getEquipment().getItemInOffHand());
 			if (base != null)
 				base.hitEntity(e);
+			if (entity instanceof Player)
+				for (ItemStack item : ((Player) entity).getInventory().getStorageContents()) {
+					base = GenericItem.getItemBase(item);
+					if (base != null)
+						base.hitEntity(e);
+				}
 		}
 	}
 	@EventHandler(priority = EventPriority.HIGH)
@@ -158,6 +175,64 @@ public class AbilityListener implements Listener {
 		GenericItem base = GenericItem.getItemBase(e.getItem());
 		if (base != null)
 			base.consumeItem(e);
+	}
+	@EventHandler(priority = EventPriority.HIGH)
+	public void onItemDrop(EntityDropItemEvent e) {
+		if (e.isCancelled())
+			return;
+		GenericItem base = GenericItem.getItemBase(e.getItemDrop().getItemStack());
+		if (base != null)
+			base.dropItem(e);
+	}
+	@EventHandler(priority = EventPriority.HIGH)
+	public void onItemPickup(EntityPickupItemEvent e) {
+		if (e.isCancelled())
+			return;
+		GenericItem base = GenericItem.getItemBase(e.getItem().getItemStack());
+		if (base != null)
+			base.pickupItem(e);
+	}
+	@EventHandler(priority = EventPriority.NORMAL)
+	public void onEntityDeath(EntityDeathEvent e) {
+		LivingEntity entity = e.getEntity();
+		for (ItemStack item : entity.getEquipment().getArmorContents()) {
+			GenericItem base = GenericItem.getItemBase(item);
+			if (base != null)
+				base.entityDeath(e);
+		}
+		GenericItem base = GenericItem.getItemBase(entity.getEquipment().getItemInMainHand());
+		if (base != null)
+			base.entityDeath(e);
+		base = GenericItem.getItemBase(entity.getEquipment().getItemInOffHand());
+		if (base != null)
+			base.entityDeath(e);
+		if (entity instanceof Player)
+			for (ItemStack item : ((Player) entity).getInventory().getStorageContents()) {
+				base = GenericItem.getItemBase(item);
+				if (base != null)
+					base.entityDeath(e);
+			}
+	}
+	@EventHandler(priority = EventPriority.NORMAL)
+	public void onPlayerRespawn(PlayerRespawnEvent e) {
+		Player entity = e.getPlayer();
+		for (ItemStack item : entity.getEquipment().getArmorContents()) {
+			GenericItem base = GenericItem.getItemBase(item);
+			if (base != null)
+				base.entityRespawn(e);
+		}
+		GenericItem base = GenericItem.getItemBase(entity.getEquipment().getItemInMainHand());
+		if (base != null)
+			base.entityRespawn(e);
+		base = GenericItem.getItemBase(entity.getEquipment().getItemInOffHand());
+		if (base != null)
+			base.entityRespawn(e);
+		if (entity instanceof Player)
+			for (ItemStack item : ((Player) entity).getInventory().getStorageContents()) {
+				base = GenericItem.getItemBase(item);
+				if (base != null)
+					base.entityRespawn(e);
+			}
 	}
 	public static void assignProjectile(UUID uuid, GenericItem base) {
 		itemProjectiles.put(uuid, base);

@@ -11,6 +11,9 @@ import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Projectile;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.entity.EntityDeathEvent;
+import org.bukkit.event.entity.EntityDropItemEvent;
+import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.entity.EntityShootBowEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.event.entity.ProjectileLaunchEvent;
@@ -18,6 +21,7 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerItemConsumeEvent;
+import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
@@ -122,12 +126,38 @@ public abstract class GenericItem {
 	public boolean consumeItem(PlayerItemConsumeEvent event) {
 		return id.simulateAction(Action.CONSUME, event, this);
 	}
-	
+	public boolean dropItem(EntityDropItemEvent event) {
+		return id.simulateAction(Action.DROP_ITEM, event, this);
+	}
+	public boolean pickupItem(EntityPickupItemEvent event) {
+		return id.simulateAction(Action.PICKUP_ITEM, event, this);
+	}
+	public boolean entityDeath(EntityDeathEvent event) {
+		return id.simulateAction(Action.ENTITY_DEATH, event, this);
+	}
+	public boolean entityRespawn(PlayerRespawnEvent event) {
+		return id.simulateAction(Action.ENTITY_RESPAWN, event, this);
+	}
+	/**
+	 * Creates the ItemBuilder for the custom item.
+	 * <p>
+	 * <STRONG>This method is required in every items class. You should utilize the ItemBuilder create method to construct your ItemStack.</STRONG>
+	 * 
+	 * @return The created ItemBuilder
+	 * 
+	 * @see ItemBuilder#create(ItemStack)
+	 */
 	public abstract ItemBuilder createItem();
 	
 	public void stripFields(ItemMeta meta) {
 	}
 	
+	/**
+	 * Gets the GenericItem base class of the given ItemStack. Will create a new GenericItem base if one does not already exist.
+	 * 
+	 * @param item The ItemStack of the base class
+	 * @return The ItemStack's base class
+	 */
 	public static GenericItem getItemBase(ItemStack item) {
 		if (itemMap.containsKey(item))
 			return GenericItem.itemMap.get(item);
@@ -144,12 +174,27 @@ public abstract class GenericItem {
 			return null;
 		}
 	}
+	/**
+	 * Remove any item base associated with the ItemStack converting it to a normal item
+	 * 
+	 * @param item The ItemStack to detach from
+	 */
 	public static void removeBaseItem(ItemStack item) {
 		itemMap.remove(item);
 	}
+	/**
+	 * Assign a projectile to this item making it the shooter. Will run events from this ability when landing.
+	 * 
+	 * @param projectile The projectile entity
+	 */
 	public void assignProjectile(Projectile projectile) {
 		AbilityListener.assignProjectile(projectile.getUniqueId(), this);
 	}
+	/**
+	 * Remove a projectile from this items ability listeners.
+	 * 
+	 * @param uuid The unique id of the projectile to remove
+	 */
 	public void removeProjectile(UUID uuid) {
 		AbilityListener.removeProjectile(uuid);
 	}
@@ -163,6 +208,12 @@ public abstract class GenericItem {
 	public ItemStack getItem() {
 		return item;
 	}
+	/**
+	 * Registers the ItemStack to this base item class. Will swap with the current ItemStack if applicable.
+	 * 
+	 * @param item The ItemStack to register to
+	 * @return This base class
+	 */
 	public GenericItem setItem(ItemStack item) {
 		Iterator<Entry<ItemStack, GenericItem>> it = itemMap.entrySet().iterator();
 		while (it.hasNext())
