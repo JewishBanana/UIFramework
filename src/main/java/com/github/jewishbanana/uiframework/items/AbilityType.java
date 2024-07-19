@@ -1,4 +1,4 @@
-package com.jewishbanana.uiframework.items;
+package com.github.jewishbanana.uiframework.items;
 
 import java.util.HashMap;
 import java.util.Iterator;
@@ -7,8 +7,7 @@ import java.util.Map.Entry;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-import com.jewishbanana.uiframework.UIFramework;
-import com.jewishbanana.uiframework.utils.ItemBuilder;
+import com.github.jewishbanana.uiframework.UIFramework;
 
 public class AbilityType {
 	
@@ -16,7 +15,7 @@ public class AbilityType {
 	
 	private Map<UUID, Integer> cooldown = new ConcurrentHashMap<>();
 	private Class<? extends Ability> instance;
-	private String name;
+	private String displayName, registeredName;
 	private String description;
 	
 	private AbilityType(Class<? extends Ability> instance) {
@@ -25,7 +24,7 @@ public class AbilityType {
 	/**
 	 * Register a new custom ability to UIFramework. <STRONG>This must be done every time your plugin starts!</STRONG>
 	 * <p>
-	 * <i>It is good practice to make your registered name start with a prefix of your plugins name to avoid any potential conflicts with other plugins</i>
+	 * <i>It is good practice to make your registered name start with a prefix of your plugins name to avoid any potential conflicts with other plugins (e.g. uif-explosions)</i>
 	 * 
 	 * @param name The unique registered name of your ability
 	 * @param instance The associated class of your custom ability
@@ -35,7 +34,8 @@ public class AbilityType {
 		if (typeMap.containsKey(name))
 			throw new IllegalArgumentException("[UIFramework]: Cannot register ability '"+name+"' as an ability with that name is already registered!");
 		AbilityType type = new AbilityType(instance);
-		type.name = '['+name+']';
+		type.registeredName = name;
+		type.displayName = '['+name+']';
 		typeMap.put(name, type);
 		return type;
 	}
@@ -106,7 +106,7 @@ public class AbilityType {
 	 * @return The display name of the ability
 	 */
 	public String getDisplayName() {
-		return name;
+		return displayName;
 	}
 	/**
 	 * Set the display name of this ability. Display name is the name of the ability that should be displayed in game for example while using the default format of custom items lore in the ItemBuilder.
@@ -117,7 +117,7 @@ public class AbilityType {
 	 * @see ItemBuilder#assembleLore(ItemType)
 	 */
 	public void setDisplayName(String name) {
-		this.name = name;
+		this.displayName = name;
 	}
 	/**
 	 * Get the description of this ability
@@ -136,5 +136,13 @@ public class AbilityType {
 	 */
 	public void setDescription(String description) {
 		this.description = description;
+	}
+	/**
+	 * Gets the exact registered name of this ability which was registered by the owning plugin
+	 * 
+	 * @return The registered name of this ability
+	 */
+	public String getRegisteredName() {
+		return registeredName;
 	}
 }

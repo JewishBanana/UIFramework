@@ -1,15 +1,20 @@
-package com.jewishbanana.uiframework.items;
+package com.github.jewishbanana.uiframework.items;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.UUID;
 
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Projectile;
+import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.EntityDropItemEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.entity.EntityShootBowEvent;
+import org.bukkit.event.entity.PotionSplashEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.event.entity.ProjectileLaunchEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
@@ -18,19 +23,35 @@ import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerItemConsumeEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
 
-import com.jewishbanana.uiframework.UIFramework;
-import com.jewishbanana.uiframework.listeners.AbilityListener;
-import com.jewishbanana.uiframework.utils.UIFDataUtils;
-import com.jewishbanana.uiframework.utils.UIFUtils;
+import com.github.jewishbanana.uiframework.UIFramework;
+import com.github.jewishbanana.uiframework.listeners.AbilityListener;
+import com.github.jewishbanana.uiframework.utils.UIFDataUtils;
+import com.github.jewishbanana.uiframework.utils.UIFUtils;
 
 public class Ability {
 	
 	private AbilityType type;
 	private int cooldownTicks;
+	private ActivatedSlot activatingSlot = ActivatedSlot.PARENT;
+	
+	protected boolean persist;
 	
 	private static boolean opCooldowns;
 	private static boolean immuneCooldowns;
+	private static boolean cooldownMessages;
+	private static boolean chatMessages;
 	
+	/**
+	 * Will attempt to determine if the given entity is on cooldown for this ability. If the entity is not on cooldown then this will immediatly set them to the full length cooldown of this ability. 
+	 * Will send players on cooldown an indicating message of the cooldown which can be configured by the user in UIFramework's config.
+	 * 
+	 * @param entity The entity to perform the check on
+	 * @return If the entity was on cooldown for this ability or not
+	 */
+	public boolean use(Entity entity) {
+		return use(entity, true);
+	}
+	/**
 	/**
 	 * Will attempt to determine if the given entity is on cooldown for this ability. If the entity is not on cooldown then this will immediatly set them to the full length cooldown of this ability.
 	 * Also optionally will send players on cooldown an indicating message of the cooldown which can be configured by the user in UIFramework's config.
@@ -45,10 +66,15 @@ public class Ability {
 		if (entity instanceof Player && ((!opCooldowns && entity.isOp()) || (!immuneCooldowns && UIFUtils.isPlayerImmune((Player) entity))))
 			return true;
 		if (type.isEntityOnCooldown(entity.getUniqueId())) {
-			if (sendMessage && entity instanceof Player)
-				((Player) entity).sendMessage(UIFUtils.convertString(UIFDataUtils.getConfigString("messages.abilityCooldown")
-						.replace("%cooldown%", UIFDataUtils.getDecimalFormatted((double) (type.getEntityCooldown(entity.getUniqueId())) / 20.0))
-						.replace("%ability%", type.getDisplayName())));
+			if (cooldownMessages && sendMessage && entity instanceof Player)
+				if (chatMessages)
+					((Player) entity).sendMessage(UIFUtils.convertString(UIFDataUtils.getConfigString("messages.abilityCooldown")
+							.replace("%cooldown%", UIFDataUtils.getDecimalFormatted((double) (type.getEntityCooldown(entity.getUniqueId())) / 20.0))
+							.replace("%ability%", type.getDisplayName())));
+				else
+					((Player) entity).spigot().sendMessage(net.md_5.bungee.api.ChatMessageType.ACTION_BAR, new net.md_5.bungee.api.chat.TextComponent(UIFUtils.convertString(UIFDataUtils.getConfigString("messages.abilityCooldown")
+							.replace("%cooldown%", UIFDataUtils.getDecimalFormatted((double) (type.getEntityCooldown(entity.getUniqueId())) / 20.0))
+							.replace("%ability%", type.getDisplayName()))));
 			return false;
 		} else {
 			type.putEntityOnCooldown(entity.getUniqueId(), getCooldownTicks());
@@ -56,252 +82,128 @@ public class Ability {
 		}
 	}
 	/**
-	 * <STRONG>This method should be overriden in the abilities class.</STRONG>
-	 * <p>
-	 * Empty activation method that will be run whenever the ability is activated. This is used by the default listener methods to fire a default action of the ability when activated.
-	 * 
-	 * @param activatingEntity The activating entity
-	 */
-	public void activate(Entity activatingEntity) {
-	}
-	/**
 	 * Run whenever a PlayerInteractEvent is fired involving the ability.
-	 * <p>
-	 * <STRONG>Default Behavior:</STRONG> Will activate on the interacting player
 	 * 
 	 * @param event The event involved
 	 * @param base The base class of the firing item
-	 * @return If the ability activated or not
 	 */
-	public boolean interacted(PlayerInteractEvent event, GenericItem base) {
-		if (use(event.getPlayer(), true)) {
-			activate(event.getPlayer());
-			return true;
-		}
-		return false;
-	}
+	public void interacted(PlayerInteractEvent event, GenericItem base) {}
 	/**
 	 * Run whenever a PlayerInteractEntityEvent is fired involving the ability.
-	 * <p>
-	 * <STRONG>Default Behavior:</STRONG> Will activate on the right clicked entity
 	 * 
 	 * @param event The event involved
 	 * @param base The base class of the firing item
-	 * @return If the ability activated or not
 	 */
-	public boolean interactedEntity(PlayerInteractEntityEvent event, GenericItem base) {
-		if (use(event.getPlayer(), true)) {
-			activate(event.getRightClicked());
-			return true;
-		}
-		return false;
-	}
+	public void interactedEntity(PlayerInteractEntityEvent event, GenericItem base) {}
 	/**
 	 * Run whenever an EntityDamageByEntityEvent is fired involving the ability.
-	 * <p>
-	 * <STRONG>Default Behavior:</STRONG> Will activate on the damaged entity
 	 * 
 	 * @param event The event involved
 	 * @param base The base class of the firing item
-	 * @return If the ability activated or not
 	 */
-	public boolean hitEntity(EntityDamageByEntityEvent event, GenericItem base) {
-		if (use(event.getDamager(), true)) {
-			activate(event.getEntity());
-			return true;
-		}
-		return false;
-	}
+	public void hitEntity(EntityDamageByEntityEvent event, GenericItem base) {}
 	/**
 	 * Run whenever an EntityDamageByEntityEvent is fired involving the ability.
-	 * <p>
-	 * <STRONG>Default Behavior:</STRONG> Will activate on the damaged entity
 	 * 
 	 * @param event The event involved
 	 * @param base The base class of the firing item
-	 * @return If the ability activated or not
 	 */
-	public boolean wasHit(EntityDamageByEntityEvent event, GenericItem base) {
-		if (use(event.getEntity(), true)) {
-			activate(event.getEntity());
-			return true;
-		}
-		return false;
-	}
+	public void wasHit(EntityDamageByEntityEvent event, GenericItem base) {}
 	/**
 	 * Run whenever a ProjectileLaunchEvent is fired involving the ability.
-	 * <p>
-	 * <STRONG>Default Behavior:</STRONG> Will activate on the projectile entity. Will always activate if 
-	 * the shooter is null or N/A.
 	 * 
 	 * @param event The event involved
 	 * @param base The base class of the firing item
-	 * @return If the ability activated or not
 	 */
-	public boolean projectileThrown(ProjectileLaunchEvent event, GenericItem base) {
-		if (event.getEntity().getShooter() != null && event.getEntity().getShooter() instanceof Entity) {
-			if (use((Entity) event.getEntity().getShooter(), true)) {
-				activate(event.getEntity());
-				return true;
-			}
-			return false;
-		}
-		activate(event.getEntity());
-		return true;
-	}
+	public void projectileThrown(ProjectileLaunchEvent event, GenericItem base) {}
 	/**
 	 * Run whenever a ProjectileHitEvent is fired involving the ability.
-	 * <p>
-	 * <STRONG>Default Behavior:</STRONG> Will activate on the projectile entity. Will always activate if 
-	 * the shooter is null or N/A.
 	 * 
 	 * @param event The event involved
 	 * @param base The base class of the firing item
-	 * @return If the ability activated or not
 	 */
-	public boolean projectileHit(ProjectileHitEvent event, GenericItem base) {
-		if (event.getEntity().getShooter() != null && event.getEntity().getShooter() instanceof Entity) {
-			if (use((Entity) event.getEntity().getShooter(), true)) {
-				activate(event.getEntity());
-				return true;
-			}
-			return false;
-		}
-		activate(event.getEntity());
-		return true;
-	}
+	public void projectileHit(ProjectileHitEvent event, GenericItem base) {}
 	/**
 	 * Run whenever a ProjectileHitEvent is fired involving the ability.
-	 * <p>
-	 * <STRONG>Default Behavior:</STRONG> Will activate on the hit entity
 	 * 
 	 * @param event The event involved
 	 * @param base The base class of the firing item
-	 * @return If the ability activated or not
 	 */
-	public boolean hitByProjectile(ProjectileHitEvent event, GenericItem base) {
-		if (use(event.getHitEntity(), true)) {
-			activate(event.getHitEntity());
-			return true;
-		}
-		return false;
-	}
+	public void hitByProjectile(ProjectileHitEvent event, GenericItem base) {}
 	/**
 	 * Run whenever an EntityShootBowEvent is fired involving the ability.
-	 * <p>
-	 * <STRONG>Default Behavior:</STRONG> Will activate on the shooting entity
 	 * 
 	 * @param event The event involved
 	 * @param base The base class of the firing item
-	 * @return If the ability activated or not
 	 */
-	public boolean shotBow(EntityShootBowEvent event, GenericItem base) {
-		if (use(event.getEntity(), true)) {
-			activate(event.getEntity());
-			return true;
-		}
-		return false;
-	}
+	public void shotBow(EntityShootBowEvent event, GenericItem base) {}
 	/**
 	 * Run whenever an InventoryClickEvent is fired involving the ability.
-	 * <p>
-	 * <STRONG>Default Behavior:</STRONG> Will activate on the clicking entity
 	 * 
 	 * @param event The event involved
 	 * @param base The base class of the firing item
-	 * @return If the ability activated or not
 	 */
-	public boolean inventoryClick(InventoryClickEvent event, GenericItem base) {
-		if (use(event.getWhoClicked(), true)) {
-			activate(event.getWhoClicked());
-			return true;
-		}
-		return false;
-	}
+	public void inventoryClick(InventoryClickEvent event, GenericItem base) {}
 	/**
 	 * Run whenever a PlayerItemConsumeEvent is fired involving the ability.
-	 * <p>
-	 * <STRONG>Default Behavior:</STRONG> Will activate on the consuming player
 	 * 
 	 * @param event The event involved
 	 * @param base The base class of the firing item
-	 * @return If the ability activated or not
 	 */
-	public boolean consumeItem(PlayerItemConsumeEvent event, GenericItem base) {
-		if (use(event.getPlayer(), true)) {
-			activate(event.getPlayer());
-			return true;
-		}
-		return false;
-	}
+	public void consumeItem(PlayerItemConsumeEvent event, GenericItem base) {}
+	/**
+	 * Run whenever a PotionSplashEvent is fired involving the ability.
+	 * 
+	 * @param event The event involved
+	 * @param base The base class of the firing item
+	 */
+	public void splashPotion(PotionSplashEvent event, GenericItem base) {}
 	/**
 	 * Run whenever an EntityDropItemEvent is fired involving the ability.
-	 * <p>
-	 * <STRONG>Default Behavior:</STRONG> Will activate on the dropped item entity
 	 * 
 	 * @param event The event involved
 	 * @param base The base class of the firing item
-	 * @return If the ability activated or not
 	 */
-	public boolean dropItem(EntityDropItemEvent event, GenericItem base) {
-		if (use(event.getEntity(), true)) {
-			activate(event.getItemDrop());
-			return true;
-		}
-		return false;
-	}
+	public void dropItem(EntityDropItemEvent event, GenericItem base) {}
 	/**
 	 * Run whenever an EntityPickupItemEvent is fired involving the ability.
-	 * <p>
-	 * <STRONG>Default Behavior:</STRONG> Will activate on the entity picking up
 	 * 
 	 * @param event The event involved
 	 * @param base The base class of the firing item
-	 * @return If the ability activated or not
 	 */
-	public boolean pickupItem(EntityPickupItemEvent event, GenericItem base) {
-		if (use(event.getEntity(), true)) {
-			activate(event.getEntity());
-			return true;
-		}
-		return false;
-	}
+	public void pickupItem(EntityPickupItemEvent event, GenericItem base) {}
 	/**
 	 * Run whenever an EntityDeathEvent is fired involving the ability.
-	 * <p>
-	 * <STRONG>Default Behavior:</STRONG> Will activate on the dying entity
 	 * 
 	 * @param event The event involved
 	 * @param base The base class of the firing item
-	 * @return If the ability activated or not
 	 */
-	public boolean entityDeath(EntityDeathEvent event, GenericItem base) {
-		if (use(event.getEntity(), true)) {
-			activate(event.getEntity());
-			return true;
-		}
-		return false;
-	}
+	public void entityDeath(EntityDeathEvent event, GenericItem base) {}
 	/**
 	 * Run whenever a PlayerRespawnEvent is fired involving the ability.
-	 * <p>
-	 * <STRONG>Default Behavior:</STRONG> Will activate on the player respawning
 	 * 
 	 * @param event The event involved
 	 * @param base The base class of the firing item
-	 * @return If the ability activated or not
 	 */
-	public boolean entityRespawn(PlayerRespawnEvent event, GenericItem base) {
-		if (use(event.getPlayer(), true)) {
-			activate(event.getPlayer());
-			return true;
-		}
-		return false;
-	}
+	public void entityRespawn(PlayerRespawnEvent event, GenericItem base) {}
+	/**
+	 * Run whenever a BlockPlaceEvent is fired involving the ability.
+	 * 
+	 * @param event The event involved
+	 * @param base The base class of the firing item
+	 */
+	public void placeBlock(BlockPlaceEvent event, GenericItem base) {}
+	/**
+	 * Run whenever a BlockPlaceEvent is fired involving the ability.
+	 * 
+	 * @param event The event involved
+	 * @param base The base class of the firing item
+	 */
+	public void breakBlock(BlockBreakEvent event, GenericItem base) {}
 	/**
 	 * <STRONG>This method should be overriden if needed in your abilities class.</STRONG>
 	 * <p>
-	 * Run when the server is shutting down or being reloaded. This method should remove anything from your ability that is not meant to persist through these actions.
+	 * Run when the server is shutting down or being reloaded. This method should remove anything from your ability that is not meant to persist through these actions (e.g. Entities spawned, return item that was thrown during ability)
 	 */
 	public void clean() {
 	}
@@ -322,9 +224,23 @@ public class Ability {
 	public void removeProjectile(UUID uuid) {
 		AbilityListener.removeProjectile(uuid);
 	}
+	public Map<String, Object> serialize() {
+		Map<String, Object> map = new LinkedHashMap<>();
+		map.put("_abilityType", type.getRegisteredName());
+		map.put("_cooldownTicks", cooldownTicks);
+		map.put("_activatingSlot", activatingSlot.toString());
+		return map;
+	}
+	public void deserialize(Map<String, Object> map) {
+		type = AbilityType.getAbilityType((String) map.get("_abilityType"));
+		cooldownTicks = (int) map.get("_cooldownTicks");
+		activatingSlot = ActivatedSlot.valueOf((String) map.get("_activatingSlot"));
+	}
 	public static void pluginReload() {
 		opCooldowns = UIFDataUtils.getConfigBoolean("general.give_op_cooldowns");
 		immuneCooldowns = UIFDataUtils.getConfigBoolean("general.give_immune_cooldowns");
+		cooldownMessages = UIFDataUtils.getConfigBoolean("general.send_cooldown_messages");
+		chatMessages = !(UIFDataUtils.getConfigString("general.cooldown_message_appearance").equalsIgnoreCase("hotbar") && UIFUtils.usingSpigot);
 	}
 	
 	public AbilityType getType() {
@@ -334,11 +250,23 @@ public class Ability {
 		this.type = type;
 		return this;
 	}
+	public String getDisplayName() {
+		return type.getDisplayName();
+	}
+	public String getDescription() {
+		return type.getDescription();
+	}
 	public int getCooldownTicks() {
 		return cooldownTicks;
 	}
 	public void setCooldownTicks(int cooldownTicks) {
 		this.cooldownTicks = cooldownTicks;
+	}
+	public ActivatedSlot getActivatingSlot() {
+		return activatingSlot;
+	}
+	public void setActivatingSlot(ActivatedSlot activatingSlot) {
+		this.activatingSlot = activatingSlot;
 	}
 	public enum Action {
 		LEFT_CLICK("action.left_click"),
@@ -351,9 +279,12 @@ public class Ability {
 		SHIFT_RIGHT_CLICK_BLOCK("action.shift_right_click_block"),
 		INVENTORY_CLICK("action.inventory_click"),
 		CONSUME("action.consume"),
+		SPLASH_POTION("action.splash_potion"),
 		INTERACT_ENTITY("action.interact_entity"),
 		DROP_ITEM("action.drop_item"),
 		PICKUP_ITEM("action.pickup_item"),
+		PLACE_BLOCK("action.place_block"),
+		BREAK_BLOCK("action.break_block"),
 		
 		HIT_ENTITY("action.passive"),
 		WAS_HIT("action.passive"),
@@ -362,7 +293,9 @@ public class Ability {
 		HIT_BY_PROJECTILE("action.passive"),
 		SHOT_BOW("action.passive"),
 		ENTITY_DEATH("action.passive"),
-		ENTITY_RESPAWN("action.passive");
+		ENTITY_RESPAWN("action.passive"),
+		PASSIVE("action.passive"),
+		UNBOUND("action.passive");
 		
 		private String path;
 		private boolean passive;

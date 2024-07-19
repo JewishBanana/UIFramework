@@ -1,4 +1,4 @@
-package com.jewishbanana.uiframework.utils;
+package com.github.jewishbanana.uiframework.utils;
 
 import java.text.DecimalFormat;
 import java.util.Arrays;
@@ -10,13 +10,14 @@ import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.Recipe;
 import org.bukkit.inventory.RecipeChoice;
 import org.bukkit.inventory.ShapedRecipe;
 import org.bukkit.inventory.ShapelessRecipe;
 
-import com.jewishbanana.uiframework.UIFramework;
+import com.github.jewishbanana.uiframework.UIFramework;
 
 public class UIFDataUtils {
 	
@@ -71,12 +72,11 @@ public class UIFDataUtils {
 			return 0;
 		}
 	}
-	public static String capitalizeFormat(String string) {
-		StringBuilder temp = new StringBuilder(string);
-		if (temp.length() >= 1)
-			temp.setCharAt(0, Character.toUpperCase(temp.charAt(0)));
-		for (int i=0; i < temp.length(); i++)
-			if (temp.charAt(i) == ' ' && temp.length() > i+1)
+	public static String formatEnchant(Enchantment enchant) {
+		StringBuilder temp = new StringBuilder(enchant.getKey().getKey());
+		temp.setCharAt(0, Character.toUpperCase(temp.charAt(0)));
+		for (int i=1; i < temp.length(); i++)
+			if (temp.charAt(i) == ' ' && temp.length() > i+1 && temp.charAt(i+1) != ' ')
 				temp.setCharAt(i+1, Character.toUpperCase(temp.charAt(i+1)));
 		return temp.toString();
 	}

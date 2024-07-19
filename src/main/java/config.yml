@@ -5,8 +5,16 @@ general:
     give_op_cooldowns: true
     # If disabled players in creative or spectator will not recieve cooldowns
     give_immune_cooldowns: true
+    # If set to false cooldown messages for abilities will not be sent to players
+    send_cooldown_messages: true
+    # Determines where to send cooldown messages to players (Can use 'CHAT' or 'HOTBAR')
+    cooldown_message_appearance: 'CHAT'
     # If set to true then players can use color codes '&' for item names in custom anvil recipes or hex codes formatted as such '(hex:#ffffff)'
     allow_rename_colors: false
+    # If set to true then will print debug error warnings to the console
+    debug_messages: true
+    # This setting will automatically refresh custom item abilities and lore when an inventory is opened. This may cause lag if there are too many custom items on the server, turn off if you experience lag with this
+    refresh_on_open: true
 messages:
     # Message displayed to non player entities who run player only commands
     console_error_message: "&cUnable to execute command from console!"

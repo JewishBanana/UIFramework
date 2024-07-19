@@ -1,8 +1,10 @@
-package com.jewishbanana.uiframework.utils;
+package com.github.jewishbanana.uiframework.utils;
 
 import java.awt.Color;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -16,6 +18,9 @@ import org.bukkit.GameMode;
 import org.bukkit.Material;
 import org.bukkit.Tag;
 import org.bukkit.block.Block;
+import org.bukkit.block.BlockFace;
+import org.bukkit.block.data.type.RedstoneWire;
+import org.bukkit.block.data.type.RedstoneWire.Connection;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.EntityCategory;
 import org.bukkit.entity.LivingEntity;
@@ -24,14 +29,15 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
 
-import com.jewishbanana.uiframework.items.GenericItem;
+import com.github.jewishbanana.uiframework.items.ActivatedSlot;
+import com.github.jewishbanana.uiframework.items.GenericItem;
 
 public class UIFUtils {
 	
 	public static int descriptionLine;
 	public static String prefix;
 	private static Pattern hexPattern;
-	private static boolean usingSpigot;
+	public static boolean usingSpigot;
 	private static Random random;
 	private static Map<DyeColor, ChatColor> dyeChatMap = new HashMap<>();
 	static
@@ -120,7 +126,6 @@ public class UIFUtils {
 	}
 	public static String getNumerical(int num) {
 		switch (num) {
-		default:
 		case 1: return "I";
 		case 2: return "II";
 		case 3: return "III";
@@ -131,17 +136,19 @@ public class UIFUtils {
 		case 8: return "VIII";
 		case 9: return "IX";
 		case 10: return "X";
+		default: return ""+num;
 		}
 	}
+	@SuppressWarnings("deprecation")
 	public static double getEnchantDamage(ItemStack item, LivingEntity toDamage) {
 		ItemMeta meta = item.getItemMeta();
 		double damage = 0.0;
-		if (meta.hasEnchant(Enchantment.DAMAGE_ALL))
-			damage += 0.5 * (meta.getEnchantLevel(Enchantment.DAMAGE_ALL) - 1) + 1.0;
-		if (toDamage != null && meta.hasEnchant(Enchantment.DAMAGE_UNDEAD) && toDamage.getCategory() == EntityCategory.UNDEAD)
-			damage += 2.5 * meta.getEnchantLevel(Enchantment.DAMAGE_UNDEAD);
-		if (toDamage != null && meta.hasEnchant(Enchantment.DAMAGE_ARTHROPODS) && toDamage.getCategory() == EntityCategory.ARTHROPOD)
-			damage += 2.5 * meta.getEnchantLevel(Enchantment.DAMAGE_ARTHROPODS);
+		if (meta.hasEnchant(VersionUtils.getSharpness()))
+			damage += 0.5 * (meta.getEnchantLevel(VersionUtils.getSharpness()) - 1) + 1.0;
+		if (toDamage != null && meta.hasEnchant(VersionUtils.getSmite()) && toDamage.getCategory() == EntityCategory.UNDEAD)
+			damage += 2.5 * meta.getEnchantLevel(VersionUtils.getSmite());
+		if (toDamage != null && meta.hasEnchant(VersionUtils.getArthropods()) && toDamage.getCategory() == EntityCategory.ARTHROPOD)
+			damage += 2.5 * meta.getEnchantLevel(VersionUtils.getArthropods());
 		if (toDamage != null && meta.hasEnchant(Enchantment.IMPALING) && toDamage.getCategory() == EntityCategory.WATER)
 			damage += 2.5 * meta.getEnchantLevel(Enchantment.IMPALING);
 		return damage;
@@ -154,14 +161,24 @@ public class UIFUtils {
 		Material type = block.getType();
 		if (!type.isInteractable())
 			return false;
-		if (Tag.STAIRS.isTagged(type) || Tag.FENCES.isTagged(type))
+		if (Tag.STAIRS.isTagged(type) || Tag.FENCES.isTagged(type) || Tag.CANDLES.isTagged(type) || Tag.CANDLE_CAKES.isTagged(type) || Tag.CAULDRONS.isTagged(type))
 			return false;
 		switch (type) {
 		case MOVING_PISTON:
 		case PUMPKIN:
-		case REDSTONE_ORE:
-		case REDSTONE_WIRE:
+		case CAKE:
 			return false;
+		case REDSTONE_WIRE:
+			RedstoneWire wire = (RedstoneWire) block.getBlockData();
+			for (BlockFace face : Arrays.asList(BlockFace.NORTH, BlockFace.EAST, BlockFace.SOUTH, BlockFace.WEST))
+				if (wire.getFace(face) == Connection.NONE)
+					continue;
+				else if (wire.getFace(face) == Connection.SIDE) {
+					if (block.getRelative(face).getType() == Material.REDSTONE_WIRE)
+						return false;
+				} else
+					return false;
+			return true;
 		default:
 			return true;
 		}
@@ -169,23 +186,89 @@ public class UIFUtils {
 	public static boolean isItemSimilar(ItemStack sample, ItemStack expected, boolean ignoreName) {
 		if (sample == null || expected == null || sample.getType() != expected.getType() || sample.hasItemMeta() != expected.hasItemMeta())
         	return false;
-        GenericItem base = GenericItem.getItemBase(sample);
+        GenericItem base = GenericItem.getItemBaseNoID(sample);
         ItemStack item = sample.clone();
         ItemMeta meta = item.getItemMeta();
-        if (sample.hasItemMeta()) {
+        if (meta != null) {
         	if (ignoreName)
             	meta.setDisplayName(expected.getItemMeta().getDisplayName());
+        	else if (!meta.getDisplayName().equals(expected.getItemMeta().getDisplayName()))
+        		return false;
         	if (meta instanceof Damageable)
         		((Damageable) meta).setDamage(0);
         }
         if (base != null) {
-        	base.getId().getBuilder().assembleLore(item, meta, base.getId(), null);
-        	base.stripFields(meta);
+        	base.getType().getBuilder().assembleLore(item, meta, base.getType(), null);
+        	base.stripTags(meta);
     		return Bukkit.getItemFactory().equals(meta, expected.getItemMeta());
         }
         return (sample.hasItemMeta() ? Bukkit.getItemFactory().equals(meta, expected.getItemMeta()) : true);
 	}
 	public static Random getRandom() {
 		return random;
+	}
+	public static Map<GenericItem, ActivatedSlot> getEntityContents(LivingEntity entity) {
+		Map<GenericItem, ActivatedSlot> items = new LinkedHashMap<>();
+		GenericItem mainHand = GenericItem.getItemBase(entity.getEquipment().getItemInMainHand());
+		if (mainHand != null)
+			items.put(mainHand, ActivatedSlot.MAIN_HAND);
+		GenericItem offHand = GenericItem.getItemBase(entity.getEquipment().getItemInOffHand());
+		if (offHand != null)
+			items.put(offHand, ActivatedSlot.OFF_HAND);
+		for (ItemStack stack : entity.getEquipment().getArmorContents()) {
+			GenericItem base = GenericItem.getItemBase(stack);
+			if (base != null)
+				items.put(base, ActivatedSlot.ARMOR);
+		}
+		if (entity instanceof Player) {
+			Player player = (Player) entity;
+			for (int i=0; i < 36; i++) {
+				if (i < 9) {
+					GenericItem base = GenericItem.getItemBase(player.getInventory().getContents()[i]);
+					if (base != null)
+						items.putIfAbsent(base, ActivatedSlot.HOTBAR);
+					continue;
+				}
+				GenericItem base = GenericItem.getItemBase(player.getInventory().getContents()[i]);
+				if (base != null)
+					items.put(base, ActivatedSlot.STORAGE);
+			}
+		}
+		return items;
+	}
+	public static boolean isActivatingSlot(ActivatedSlot test, ActivatedSlot category, ActivatedSlot active, GenericItem base) {
+		switch (category) {
+		default:
+		case ANY:
+			return true;
+		case PARENT:
+			return isActivatingSlot(test, base.getActivatingSlot(), active, base);
+		case ACTIVE_SLOT:
+			if (test == active || active == ActivatedSlot.ANY)
+				return true;
+			break;
+		case HAND:
+			if (test == ActivatedSlot.HAND)
+				return true;
+		case MAIN_HAND:
+			if (test == ActivatedSlot.MAIN_HAND)
+				return true;
+		case OFF_HAND:
+			if (test == ActivatedSlot.OFF_HAND)
+				return true;
+			break;
+		case ARMOR:
+			if (test == ActivatedSlot.ARMOR)
+				return true;
+			break;
+		case STORAGE:
+			if (test == ActivatedSlot.STORAGE)
+				return true;
+		case HOTBAR:
+			if (test == ActivatedSlot.HOTBAR)
+				return true;
+			break;
+		}
+		return false;
 	}
 }

@@ -1,4 +1,4 @@
-package com.jewishbanana.uiframework.listeners.menus;
+package com.github.jewishbanana.uiframework.listeners.menus;
 
 import java.util.HashMap;
 import java.util.Map;

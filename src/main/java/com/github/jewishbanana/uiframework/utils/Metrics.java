@@ -12,7 +12,7 @@
  *
  * Violations will result in a ban of your plugin and account from bStats.
  */
-package com.jewishbanana.uiframework.utils;
+package com.github.jewishbanana.uiframework.utils;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
@@ -50,8 +50,8 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import com.jewishbanana.uiframework.UIFramework;
-import com.jewishbanana.uiframework.items.ItemType;
+import com.github.jewishbanana.uiframework.UIFramework;
+import com.github.jewishbanana.uiframework.items.ItemType;
 
 public class Metrics {
 
@@ -66,7 +66,7 @@ public class Metrics {
 	        @Override
 	        public Map<String, Integer> call() throws Exception {
 	        	Map<String, Integer> map = new HashMap<>();
-	        	int amount = ItemType.getItemsMap().size();
+	        	int amount = ItemType.getAllItems().size();
 	        	if (amount < 5)
 	        		map.put("Less Than 5", 1);
 	        	else if (amount < 10)

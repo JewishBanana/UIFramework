@@ -10,15 +10,22 @@ action:
     shift_right_click_block: "&b[Shift-Right-Click-Block]"
     inventory_click: "&b[Inventory-Click]"
     consume: "&b[Consume]"
+    splash_potion: "&b[Splash]"
     interact_entity: "&b[Interact-Entity]"
     drop_item: "&b[Drop-Item]"
     pickup_item: "&b[Pickup-Item]"
+    place_block: "&b[Place-Block]"
+    break_block: "&b[Break-Block]"
     passive: "&a[Passive]"
 # Attribute info on custom items that use different modifiers
 attributes:
     main_hand_lore: "&7When in Main Hand:"
-    attack_damage: " &9%damage% Attack Damage"
-    attack_speed: " &9%attackSpeed% Attack Speed"
+    attack_damage: " &9%value% Attack Damage"
+    attack_speed: " &9%value% Attack Speed"
+    thrown_projectile: "&7Thrown as Projectile:"
+    projectile_damage: " &9%value% Base Damage"
+    shot_projectiles: "&7Shot Projectiles:"
+    shot_multiplier: " &9x%value% Projectile Damage"
 # Custom items added in UI
 items:
     recipeBook: "&9Recipe Book"
@@ -35,6 +42,6 @@ menu:
     acceptRecipe: "&aClick to add this recipe."
     shapedRecipe: "&dShaped Recipe"
     shapelessRecipe: "&9Shapeless Recipe"
-# DO NOT MODIFY, version storage used to automatically add new placeholders with update
-data:
-    version: 0.0
+    creationRecipes: "%value% Creation Recipe(s)"
+    usedRecipes: "Used In %value% Recipe(s)"
+    giveItem: "&7[Right-Click] &8- &6To give yourself this item."

@@ -1,13 +1,13 @@
 name: UIFramework
-version: 2.1.1
+version: 2.2.1
 author: JewishBanana
-main: com.jewishbanana.uiframework.UIFramework
+main: com.github.jewishbanana.uiframework.UIFramework
 description: Framework for custom items.
 api-version: 1.17
 
 commands:
     uiframework:
-        usage: /uiframework <help|give>...
+        usage: /uiframework <help|reload|give|recipes|enchant>...
         description: Universal command for the plugin. Use /uiframework help, for more information.
         aliases: [ui, uitems]
         
@@ -20,6 +20,7 @@ permissions:
             uiframework.give: true
             uiframework.recipes: true
             uiframework.modifyRecipes: true
+            uiframework.enchant: true
     uiframework.help:
         description: Allows you to use the help command.
     uiframework.reload:
@@ -30,3 +31,5 @@ permissions:
         description: Allows you to view the item recipes by command.
     uiframework.modifyRecipes:
         description: Allows you to delete and add recipes for items.
+    uiframework.enchant:
+        description: Allows you to use the enchant command to apply custom enchants to items.

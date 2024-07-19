@@ -1,4 +1,4 @@
-package com.jewishbanana.uiframework.utils;
+package com.github.jewishbanana.uiframework.utils;
 
 import java.util.ArrayDeque;
 import java.util.List;
@@ -6,18 +6,28 @@ import java.util.Queue;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import org.bukkit.Material;
 import org.bukkit.event.inventory.PrepareAnvilEvent;
 import org.bukkit.inventory.ItemStack;
 
-import com.jewishbanana.uiframework.items.ItemType;
+import com.github.jewishbanana.uiframework.items.ItemType;
 
+@Deprecated
+/**
+ * @deprecated This class will be completely changed in a future update
+ */
 public class AnvilRecipe {
 
 	private Queue<ItemStack> ingredients;
 	private ItemStack result;
 	private boolean exactIngredients;
 	private Function<PrepareAnvilEvent, ItemStack> function;
+	private AnvilSlot slot = AnvilSlot.FIRST;
 	
+	public enum AnvilSlot {
+		FIRST,
+		SECOND
+	}
 	/**
 	 * Creates a new AnvilRecipe which can be directly registered to an ItemType.
 	 * <p>
@@ -26,7 +36,7 @@ public class AnvilRecipe {
 	 * 
 	 * @param ingredients A list of ingredients to use with your item
 	 * @param result The resulting item from this recipe
-	 * @param exactIngredients If the ingredient used must be an exact match from one of the ingredients in the list or just a Material type comparison (Durability on items will be omitted from this check)
+	 * @param exactIngredients If true the ingredient used must be an exact match of one of the ingredients in the provided list (Durability on items will be omitted from this check). If false will just use a Material type comparison.
 	 * 
 	 * @see ItemType#registerRecipe(AnvilRecipe)
 	 */
@@ -36,14 +46,22 @@ public class AnvilRecipe {
 		this.exactIngredients = exactIngredients;
 	}
 	/**
-	 * Allows you to run a function on the event and the returned item will be the resulting item used. This is run as soon as all ingredients are present and the resulting item is just placed in the result slot.
+	 * Creates a new AnvilRecipe which can be directly registered to an ItemType.
 	 * <p>
-	 * <i>Useful for utilizing this recipe as a repair recipe or adding different variations of the result</i>
+	 * As you may have noticed, you are only required to provide a list of ingredients and a result function.
+	 * This is because an AnvilRecipe can only be used to register with an ItemType so it is assumed that one of the slots already contains the ItemType you register this recipe with.
 	 * 
-	 * @param function The function that will be run (Only one function allowed per recipe)
+	 * @param ingredients A list of ingredients to use with your item
+	 * @param function The resulting function run on the event if this recipes criteria is met
+	 * @param exactIngredients If true the ingredient used must be an exact match of one of the ingredients in the provided list (Durability on items will be omitted from this check). If false will just use a Material type comparison.
+	 * 
+	 * @see ItemType#registerRecipe(AnvilRecipe)
 	 */
-	public void setFunction(Function<PrepareAnvilEvent, ItemStack> function) {
+	public AnvilRecipe(List<ItemStack> ingredients, Function<PrepareAnvilEvent, ItemStack> function, boolean exactIngredients) {
+		this.ingredients = new ArrayDeque<>(ingredients.stream().map(k -> k.clone()).collect(Collectors.toList()));
+		this.result = new ItemStack(Material.AIR);
 		this.function = function;
+		this.exactIngredients = exactIngredients;
 	}
 	public Function<PrepareAnvilEvent, ItemStack> getFunction() {
 		return function;
@@ -65,5 +83,11 @@ public class AnvilRecipe {
 	}
 	public void setExactIngredients(boolean exactIngredients) {
 		this.exactIngredients = exactIngredients;
+	}
+	public AnvilSlot getSlot() {
+		return slot;
+	}
+	public void setSlot(AnvilSlot slot) {
+		this.slot = slot;
 	}
 }

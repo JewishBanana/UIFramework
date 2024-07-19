@@ -1,4 +1,4 @@
-package com.jewishbanana.uiframework.listeners.menus;
+package com.github.jewishbanana.uiframework.listeners.menus;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -10,7 +10,7 @@ import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.inventory.Inventory;
 
-import com.jewishbanana.uiframework.UIFramework;
+import com.github.jewishbanana.uiframework.UIFramework;
 
 public class MenuManager implements Listener {
 	

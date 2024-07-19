@@ -1,8 +1,10 @@
-package com.jewishbanana.uiframework.listeners.menus;
+package com.github.jewishbanana.uiframework.listeners.menus;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.stream.Collectors;
@@ -24,10 +26,10 @@ import org.bukkit.inventory.ShapedRecipe;
 import org.bukkit.inventory.ShapelessRecipe;
 import org.bukkit.scheduler.BukkitTask;
 
-import com.jewishbanana.uiframework.UIFramework;
-import com.jewishbanana.uiframework.items.ItemType;
-import com.jewishbanana.uiframework.utils.ItemBuilder;
-import com.jewishbanana.uiframework.utils.UIFUtils;
+import com.github.jewishbanana.uiframework.UIFramework;
+import com.github.jewishbanana.uiframework.items.ItemBuilder;
+import com.github.jewishbanana.uiframework.items.ItemType;
+import com.github.jewishbanana.uiframework.utils.UIFUtils;
 
 public class RecipeMenu extends InventoryHandler {
 
@@ -36,13 +38,15 @@ public class RecipeMenu extends InventoryHandler {
 		plugin = UIFramework.getInstance();
 	}
 	private ItemType type;
+	private String itemDisplayName;
 	public int page, memoryPage;
 	private Map<Integer, Queue<ItemStack>> choiceMap = new HashMap<>();
 	private BukkitTask task;
 	public boolean adminControls;
 	
-	public RecipeMenu(ItemType type, int page, int memoryPage, boolean adminControls) {
+	public RecipeMenu(ItemType type, String itemDisplayName, int page, int memoryPage, boolean adminControls) {
 		this.type = type;
+		this.itemDisplayName = itemDisplayName;
 		this.inventory = this.createInventory();
 		this.page = page;
 		this.memoryPage = memoryPage;
@@ -53,8 +57,8 @@ public class RecipeMenu extends InventoryHandler {
 		ItemStack whiteGlass = ItemBuilder.create(Material.WHITE_STAINED_GLASS_PANE).registerName(" ").build().getItem();
 		for (int i=0; i < 45; i++)
 			this.getInventory().setItem(i, whiteGlass);
-		if (!type.recipes.isEmpty() && page <= type.recipes.size()) {
-			Recipe original = type.recipes.get(page-1);
+		if (!type.getRecipes().isEmpty() && page <= type.getRecipes().size()) {
+			Recipe original = type.getRecipes().get(page-1);
 			if (original instanceof ShapedRecipe) {
 				ShapedRecipe shapedRecipe = (ShapedRecipe) original;
 				ItemStack greenGlass = ItemBuilder.create(Material.LIME_STAINED_GLASS_PANE).registerName(UIFUtils.convertString(UIFramework.getLangString("menu.creates"))).build().getItem();
@@ -121,35 +125,42 @@ public class RecipeMenu extends InventoryHandler {
 		}
 		if (page > 1)
 			this.addButton(45, new InventoryButton().create(ItemBuilder.create(Material.ARROW).registerName(UIFUtils.convertString(UIFramework.getLangString("menu.page").replace("%number%", (page-1)+""))).build().getItem()).function(event -> {
-				RecipeMenu menu = new RecipeMenu(type, page-1, memoryPage, adminControls);
+				RecipeMenu menu = new RecipeMenu(type, itemDisplayName, page-1, memoryPage, adminControls);
 				MenuManager.registerInventory(menu.getInventory(), menu);
 				event.getWhoClicked().openInventory(menu.getInventory());
 			}));
-		if (page < type.recipes.size())
+		if (page < type.getRecipes().size())
 			this.addButton(53, new InventoryButton().create(ItemBuilder.create(Material.ARROW).registerName(UIFUtils.convertString(UIFramework.getLangString("menu.page").replace("%number%", (page+1)+""))).build().getItem()).function(event -> {
-				RecipeMenu menu = new RecipeMenu(type, page+1, memoryPage, adminControls);
+				RecipeMenu menu = new RecipeMenu(type, itemDisplayName, page+1, memoryPage, adminControls);
 				MenuManager.registerInventory(menu.getInventory(), menu);
 				event.getWhoClicked().openInventory(menu.getInventory());
 			}));
 		this.addButton(49, new InventoryButton().create(ItemBuilder.create(Material.CRAFTING_TABLE).registerName(UIFUtils.convertString(UIFramework.getLangString("menu.returnRecipe"))).build().getItem()).function(event -> {
-			ItemsMenu menu = new ItemsMenu(memoryPage);
+			ItemsMenu menu = new ItemsMenu(memoryPage, adminControls);
 			MenuManager.registerInventory(menu.getInventory(), menu);
 			event.getWhoClicked().openInventory(menu.getInventory());
 		}));
 		if (adminControls) {
-			if (type.recipes.size() >= page)
+			if (type.getRecipes().size() >= page)
 				this.addButton(47, new InventoryButton().create(ItemBuilder.create(Material.RED_WOOL).registerName(UIFUtils.convertString(UIFramework.getLangString("menu.removeRecipe"))).build().getItem()).function(event -> {
-					Recipe recipe = type.recipes.remove(page-1);
+					Recipe recipe = type.getRecipes().remove(page-1);
 					NamespacedKey key = ((Keyed) recipe).getKey();
 					UIFramework.dataFile.set(type.getDataPath()+".recipes."+key.getKey(), null);
+					if (!key.getKey().contains(type.getRegisteredName().replaceFirst(":", "-")+"_user_recipe_")) {
+						List<String> removed = new ArrayList<>();
+						if (UIFramework.dataFile.contains(type.getDataPath()+".removed_recipes"))
+							removed.addAll(UIFramework.dataFile.getStringList(type.getDataPath()+".removed_recipes"));
+						removed.add(key.getKey());
+						UIFramework.dataFile.set(type.getDataPath()+".removed_recipes", removed);
+					}
 					UIFramework.getInstance().getServer().removeRecipe(key);
 					RecipeMenu menu = null;
-					if (type.recipes.size() >= page)
-						menu = new RecipeMenu(type, page, memoryPage, adminControls);
-					else if (!type.recipes.isEmpty())
-						menu = new RecipeMenu(type, page-1, memoryPage, adminControls);
+					if (type.getRecipes().size() >= page)
+						menu = new RecipeMenu(type, itemDisplayName, page, memoryPage, adminControls);
+					else if (!type.getRecipes().isEmpty())
+						menu = new RecipeMenu(type, itemDisplayName, page-1, memoryPage, adminControls);
 					else {
-						ItemsMenu itemMenu = new ItemsMenu(memoryPage);
+						ItemsMenu itemMenu = new ItemsMenu(memoryPage, adminControls);
 						MenuManager.registerInventory(itemMenu.getInventory(), itemMenu);
 						event.getWhoClicked().openInventory(itemMenu.getInventory());
 						return;
@@ -158,7 +169,7 @@ public class RecipeMenu extends InventoryHandler {
 					event.getWhoClicked().openInventory(menu.getInventory());
 				}));
 			this.addButton(51, new InventoryButton().create(ItemBuilder.create(Material.GREEN_WOOL).registerName(UIFUtils.convertString(UIFramework.getLangString("menu.addRecipe"))).build().getItem()).function(event -> {
-				RecipeCreateMenu menu = new RecipeCreateMenu(type, null, this);
+				RecipeCreateMenu menu = new RecipeCreateMenu(type, itemDisplayName, null, this);
 				MenuManager.registerInventory(menu.getInventory(), menu);
 				event.getWhoClicked().openInventory(menu.getInventory());
 			}));
@@ -199,6 +210,6 @@ public class RecipeMenu extends InventoryHandler {
 	}
 	@Override
 	public Inventory createInventory() {
-		return Bukkit.createInventory(null, 54, UIFUtils.convertString(type.getBuilder().getItem().getItemMeta().getDisplayName()+" &9"+UIFramework.getLangString("menu.recipe")));
+		return Bukkit.createInventory(null, 54, UIFUtils.convertString(itemDisplayName+" &9"+UIFramework.getLangString("menu.recipe")));
 	}
 }

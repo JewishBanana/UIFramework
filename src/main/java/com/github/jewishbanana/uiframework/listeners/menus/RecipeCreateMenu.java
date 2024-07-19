@@ -1,4 +1,4 @@
-package com.jewishbanana.uiframework.listeners.menus;
+package com.github.jewishbanana.uiframework.listeners.menus;
 
 import java.util.Arrays;
 import java.util.HashMap;
@@ -17,11 +17,13 @@ import org.bukkit.inventory.Recipe;
 import org.bukkit.inventory.RecipeChoice;
 import org.bukkit.inventory.ShapedRecipe;
 import org.bukkit.inventory.ShapelessRecipe;
+import org.bukkit.inventory.meta.ItemMeta;
 
-import com.jewishbanana.uiframework.UIFramework;
-import com.jewishbanana.uiframework.items.ItemType;
-import com.jewishbanana.uiframework.utils.ItemBuilder;
-import com.jewishbanana.uiframework.utils.UIFUtils;
+import com.github.jewishbanana.uiframework.UIFramework;
+import com.github.jewishbanana.uiframework.items.GenericItem;
+import com.github.jewishbanana.uiframework.items.ItemBuilder;
+import com.github.jewishbanana.uiframework.items.ItemType;
+import com.github.jewishbanana.uiframework.utils.UIFUtils;
 
 public class RecipeCreateMenu extends InventoryHandler {
 
@@ -30,20 +32,23 @@ public class RecipeCreateMenu extends InventoryHandler {
 		plugin = UIFramework.getInstance();
 	}
 	private ItemType type;
+	private String itemDisplayName;
 	private String recipeType;
 	public RecipeMenu returnMenu;
 	private RecipeCreateMenu returnRecipeMenu;
 	private Recipe recipe;
 	
-	public RecipeCreateMenu(ItemType type, String recipeType, RecipeMenu returnMenu) {
+	public RecipeCreateMenu(ItemType type, String itemDisplayName, String recipeType, RecipeMenu returnMenu) {
 		this.type = type;
+		this.itemDisplayName = itemDisplayName;
 		this.recipeType = recipeType;
 		this.inventory = this.createInventory();
 		this.returnMenu = returnMenu;
 		this.decorate();
 	}
-	public RecipeCreateMenu(ItemType type, String recipeType, RecipeCreateMenu returnRecipeMenu) {
+	public RecipeCreateMenu(ItemType type, String itemDisplayName, String recipeType, RecipeCreateMenu returnRecipeMenu) {
 		this.type = type;
+		this.itemDisplayName = itemDisplayName;
 		this.recipeType = recipeType;
 		this.inventory = this.createInventory();
 		this.returnRecipeMenu = returnRecipeMenu;
@@ -62,12 +67,12 @@ public class RecipeCreateMenu extends InventoryHandler {
 				event.getWhoClicked().openInventory(returnMenu.getInventory());
 			}));
 			this.addButton(10, new InventoryButton().create(ItemBuilder.create(Material.SUGAR).registerName(UIFUtils.convertString(UIFramework.getLangString("menu.shapedRecipe"))).build().getItem()).function(event -> {
-				RecipeCreateMenu menu = new RecipeCreateMenu(type, "shaped", this);
+				RecipeCreateMenu menu = new RecipeCreateMenu(type, itemDisplayName, "shaped", this);
 				MenuManager.registerInventory(menu.getInventory(), menu);
 				event.getWhoClicked().openInventory(menu.getInventory());
 			}));
 			this.addButton(11, new InventoryButton().create(ItemBuilder.create(Material.GUNPOWDER).registerName(UIFUtils.convertString(UIFramework.getLangString("menu.shapelessRecipe"))).build().getItem()).function(event -> {
-				RecipeCreateMenu menu = new RecipeCreateMenu(type, "shapeless", this);
+				RecipeCreateMenu menu = new RecipeCreateMenu(type, itemDisplayName, "shapeless", this);
 				MenuManager.registerInventory(menu.getInventory(), menu);
 				event.getWhoClicked().openInventory(menu.getInventory());
 			}));
@@ -75,8 +80,8 @@ public class RecipeCreateMenu extends InventoryHandler {
 			ItemStack air = new ItemStack(Material.AIR);
 			String key = null;
 			for (int i=0; i < 999999; i++)
-				if (!UIFramework.dataFile.contains(type.getDataPath()+".recipes."+type.getRegisteredName()+"_recipe_"+i)) {
-					key = type.getRegisteredName()+"_recipe_"+i;
+				if (!UIFramework.dataFile.contains(type.getDataPath()+".recipes."+type.getRegisteredName().replaceFirst(":", "-")+"_user_recipe_"+i)) {
+					key = type.getRegisteredName().replaceFirst(":", "-")+"_user_recipe_"+i;
 					break;
 				}
 			if (key == null)
@@ -121,14 +126,14 @@ public class RecipeCreateMenu extends InventoryHandler {
 							else {
 								char c = Character.forDigit((i*3)+j, 10);
 								shape[i] += c;
-								choiceMap.put(c, new RecipeChoice.ExactChoice(item));
+								choiceMap.put(c, new RecipeChoice.ExactChoice(stripAndCopy(item)));
 							}
 						}
 					if (!choiceMap.isEmpty()) {
 						shapedRecipe.shape(shape);
 						choiceMap.forEach((k, v) -> shapedRecipe.setIngredient(k, v));
 						type.registerRecipe(shapedRecipe);
-						RecipeMenu menu = new RecipeMenu(type, type.recipes.size(), returnRecipeMenu.returnMenu.memoryPage, returnRecipeMenu.returnMenu.adminControls);
+						RecipeMenu menu = new RecipeMenu(type, itemDisplayName, type.getRecipes().size(), returnRecipeMenu.returnMenu.memoryPage, returnRecipeMenu.returnMenu.adminControls);
 						MenuManager.registerInventory(menu.getInventory(), menu);
 						event.getWhoClicked().openInventory(menu.getInventory());
 						return;
@@ -140,11 +145,11 @@ public class RecipeCreateMenu extends InventoryHandler {
 							int slot = ((i+1)*9)+j+1;
 							ItemStack item = this.getInventory().getItem(slot);
 							if (item != null)
-								shapedRecipe.addIngredient(new RecipeChoice.ExactChoice(item));
+								shapedRecipe.addIngredient(new RecipeChoice.ExactChoice(stripAndCopy(item)));
 						}
 					if (!shapedRecipe.getChoiceList().isEmpty()) {
 						type.registerRecipe(shapedRecipe);
-						RecipeMenu menu = new RecipeMenu(type, type.recipes.size(), returnRecipeMenu.returnMenu.memoryPage, returnRecipeMenu.returnMenu.adminControls);
+						RecipeMenu menu = new RecipeMenu(type, itemDisplayName, type.getRecipes().size(), returnRecipeMenu.returnMenu.memoryPage, returnRecipeMenu.returnMenu.adminControls);
 						MenuManager.registerInventory(menu.getInventory(), menu);
 						event.getWhoClicked().openInventory(menu.getInventory());
 						return;
@@ -155,6 +160,18 @@ public class RecipeCreateMenu extends InventoryHandler {
 			}));
 		}
 		super.decorate();
+	}
+	private ItemStack stripAndCopy(ItemStack item) {
+		GenericItem base = GenericItem.getItemBaseNoID(item.clone());
+		if (base == null)
+			return item;
+		ItemStack tempItem = base.getItem();
+		ItemMeta tempMeta = tempItem.getItemMeta();
+		base.stripTags(tempMeta);
+		base.getFields().clear();
+		base.getEnchants().clear();
+		base.getType().getBuilder().assembleLore(tempItem, tempMeta, base.getType(), base);
+		return tempItem;
 	}
 	public void onClick(InventoryClickEvent event) {
 		int slot = event.getRawSlot();
@@ -207,6 +224,6 @@ public class RecipeCreateMenu extends InventoryHandler {
 	}
 	@Override
 	public Inventory createInventory() {
-		return Bukkit.createInventory(null, 54, UIFUtils.convertString(type.getBuilder().getItem().getItemMeta().getDisplayName()+" &9"+UIFramework.getLangString("menu.recipe")));
+		return Bukkit.createInventory(null, 54, UIFUtils.convertString(itemDisplayName+" &9"+UIFramework.getLangString("menu.recipe")));
 	}
 }
