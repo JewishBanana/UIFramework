@@ -86,10 +86,10 @@ public class UICommand implements CommandExecutor,TabCompleter {
 					return true;
 				}
 			}
-			ItemStack item = id.getBuilder().getItem();
+			ItemStack item = id.getItem();
 			GenericItem giveBase = GenericItem.getItemBase(item);
 			if (giveBase != null)
-				giveBase.getType().getBuilder().assembleLore(item, item.getItemMeta(), giveBase.getType(), giveBase);
+				giveBase.refreshItemLore();
 			int given = 0;
 			for (int i=0; i < amount; i++) {
 				target.getInventory().addItem(item);

@@ -475,6 +475,14 @@ public class GenericItem {
 		AbilityListener.removeProjectile(uuid);
 	}
 	/**
+	 * Gets the unique abilities that are put on this exact base item.
+	 * 
+	 * @return The unique abilities present on this base item
+	 */
+	public Map<Ability, Set<Action>> getUniqueAbilities() {
+		return uniqueAbilities;
+	}
+	/**
 	 * Adds a unique ability that is only applied to this specific item.
 	 * 
 	 * @param ability The ability to add
@@ -541,7 +549,7 @@ public class GenericItem {
 		meta = item.getItemMeta();
 		meta.getPersistentDataContainer().set(defaultsKey, PersistentDataType.INTEGER_ARRAY, defaults.stream().mapToInt(i -> i).toArray());
 		item.setItemMeta(meta);
-		type.getBuilder().assembleLore(item, meta, type, this);
+		refreshItemLore();
 		return this;
 	}
 	/**

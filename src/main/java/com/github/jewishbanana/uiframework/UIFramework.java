@@ -172,19 +172,21 @@ public class UIFramework extends JavaPlugin {
 	 */
 	public static boolean isVersionOrAbove(String version) {
 		try {
-			String[] current = instance.getDescription().getVersion().split(".");
-			String[] test = version.split(".");
-			for (int i=0; i < test.length; i++)
-				if (i >= current.length)
-					return true;
-				else {
-					if (Integer.parseInt(current[i]) >= Integer.parseInt(test[i]))
-						continue;
-					return false;
-				}
+			String[] current = instance.getDescription().getVersion().split("\\.");
+			String[] test = version.split("\\.");
+			for (int i = 0; i < test.length; i++) {
+	            if (i >= current.length)
+	                return false;
+	            int currentSegment = Integer.parseInt(current[i]);
+	            int testSegment = Integer.parseInt(test[i]);
+	            if (currentSegment > testSegment)
+	                return true;
+	            else if (currentSegment < testSegment)
+	                return false;
+	        }
+	        return true;
 		} catch (NumberFormatException ex) {
 			throw new NumberFormatException("The version string you supplied '"+version+"' is not a valid version string! Format must be as follows: '1.2.3' or '1.2' or '1'!");
 		}
-		return false;
 	}
 }

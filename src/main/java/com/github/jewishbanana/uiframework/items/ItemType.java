@@ -62,6 +62,7 @@ public class ItemType {
 	private double projectileDamageMultiplier = 1.0;
 	private List<String> lore = new ArrayList<>();
 	private boolean allowVanillaCrafts = true;
+	private boolean allowVanillaEnchanting = true;
 	private boolean useLoreFormat = true;
 	private ItemCategory itemCategory = ItemCategory.DefaultCategory.MISCELLANEOUS.getItemCategory();
 	
@@ -133,7 +134,7 @@ public class ItemType {
 		plugin.getServer().getScheduler().runTaskLater(plugin, () -> recipeNames.forEach((k, v) -> {
 			ItemType type = getItemType(v.getFirst());
 			if (type != null) {
-				GenericItem base = GenericItem.getItemBaseNoID(type.getBuilder().getItem());
+				GenericItem base = GenericItem.getItemBaseNoID(type.getItem());
 				type.addRecipe(UIFDataUtils.createRecipeFromSection(v.getSecond(), base.getItem(), new NamespacedKey(plugin, k)));
 			}
 		}), 1);
@@ -148,7 +149,7 @@ public class ItemType {
 			return;
 		GenericItem base = GenericItem.getItemBaseNoID(builder.getItem());
 		enchants.forEach((k, v) -> k.loadEnchant(base));
-		base.getType().getBuilder().assembleLore(base.getItem(), base.getItem().getItemMeta(), base.getType(), base);
+		base.refreshItemLore();
 		ShapedRecipe shapedRecipe = new ShapedRecipe(new NamespacedKey(plugin, recipe.getKey().getKey()), base.getItem());
 		shapedRecipe.shape(recipe.getShape());
 		recipe.getChoiceMap().forEach((k, v) -> shapedRecipe.setIngredient(k, v));
@@ -164,7 +165,7 @@ public class ItemType {
 			return;
 		GenericItem base = GenericItem.getItemBaseNoID(builder.getItem());
 		enchants.forEach((k, v) -> k.loadEnchant(base));
-		base.getType().getBuilder().assembleLore(base.getItem(), base.getItem().getItemMeta(), base.getType(), base);
+		base.refreshItemLore();
 		ShapelessRecipe shapelessRecipe = new ShapelessRecipe(new NamespacedKey(plugin, recipe.getKey().getKey()), base.getItem());
 		recipe.getChoiceList().forEach(k -> shapelessRecipe.addIngredient(k));
 		addRecipe(shapelessRecipe);
@@ -489,8 +490,21 @@ public class ItemType {
 	public Class<? extends GenericItem> getInstance() {
 		return instance;
 	}
+	/**
+	 * Get the items builder class which is associated with this ItemType. This is the instance created with {@link GenericItem#createItem()} within your items class.
+	 * 
+	 * @return This item types builder class
+	 */
 	public ItemBuilder getBuilder() {
 		return builder;
+	}
+	/**
+	 * Creates a new copy of this item type as an ItemStack. Convienence method for getting the builder and creating the item there.
+	 * 
+	 * @return Copy of this item type as a new Bukkit ItemStack
+	 */
+	public ItemStack getItem() {
+		return builder.getItem();
 	}
 	public String getDataPath() {
 		return dataPath;
@@ -609,6 +623,19 @@ public class ItemType {
 	 */
 	public void setAllowVanillaCrafts(boolean allowVanillaCrafts) {
 		this.allowVanillaCrafts = allowVanillaCrafts;
+	}
+	public boolean isAllowVanillaEnchanting() {
+		return allowVanillaEnchanting;
+	}
+	/**
+	 * Set wether to allow your item to be enchanted with vanilla enchants in anvils and enchanting tables.
+	 * <p>
+	 * <STRONG>Default behavior is to allow vanilla enchants</STRONG>
+	 * 
+	 * @param allowVanillaEnchanting To allow vanilla enchanting of this item type or not
+	 */
+	public void setAllowVanillaEnchanting(boolean allowVanillaEnchanting) {
+		this.allowVanillaEnchanting = allowVanillaEnchanting;
 	}
 	/**
 	 * Gets the recipes registered with this custom item type.

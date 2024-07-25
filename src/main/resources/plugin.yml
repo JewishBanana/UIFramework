@@ -1,7 +1,7 @@
 name: UIFramework
-version: 2.2.2
+version: ${project.version}
 author: JewishBanana
-main: com.github.jewishbanana.uiframework.UIFramework
+main: ${mainClass}
 description: Framework for custom items.
 api-version: 1.17
 

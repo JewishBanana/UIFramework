@@ -33,6 +33,8 @@ public class Ability {
 	private AbilityType type;
 	private int cooldownTicks;
 	private ActivatedSlot activatingSlot = ActivatedSlot.PARENT;
+	private String displayName;
+	private String description;
 	
 	protected boolean persist;
 	
@@ -251,10 +253,16 @@ public class Ability {
 		return this;
 	}
 	public String getDisplayName() {
-		return type.getDisplayName();
+		return displayName == null ? type.getDisplayName() : displayName;
+	}
+	public void setDisplayName(String displayName) {
+		this.displayName = displayName;
 	}
 	public String getDescription() {
-		return type.getDescription();
+		return description == null ? type.getDescription() : description;
+	}
+	public void setDescription(String description) {
+		this.description = description;
 	}
 	public int getCooldownTicks() {
 		return cooldownTicks;

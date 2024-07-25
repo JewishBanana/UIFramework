@@ -28,11 +28,11 @@ import com.google.common.collect.Multimap;
 
 public class ItemBuilder {
 	
-	private ItemType type;
-	private ItemStack item;
-	private ItemMeta meta;
-	private boolean enchanted;
-	private Enchantment enchantment;
+	protected ItemType type;
+	protected ItemStack item;
+	protected ItemMeta meta;
+	protected boolean enchanted;
+	protected Enchantment enchantment;
 	
 	/**
 	 * Constructs a new ItemBuilder with the given ItemStack as the item and the provided ItemType
@@ -144,6 +144,7 @@ public class ItemBuilder {
 	 * 
 	 * @see ItemBuilder#assembleLore()
 	 */
+	@SuppressWarnings("deprecation")
 	public ItemStack assembleLore(ItemStack tempItem, ItemMeta tempMeta, ItemType id, GenericItem base) {
 		if (!id.doesUseLoreFormat())
 			return tempItem;

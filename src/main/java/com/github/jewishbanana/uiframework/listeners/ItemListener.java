@@ -103,7 +103,7 @@ public class ItemListener implements Listener {
 		if (e.getCurrentItem() != null && e.getCurrentItem().getType() != Material.AIR) {
 			GenericItem item = GenericItem.getItemBase(e.getCurrentItem());
 			if (item != null)
-				item.getType().getBuilder().assembleLore(e.getCurrentItem(), e.getCurrentItem().getItemMeta(), item.getType(), item);
+				item.refreshItemLore();
 		}
 	}
 	@EventHandler(priority = EventPriority.HIGH)
@@ -114,7 +114,7 @@ public class ItemListener implements Listener {
 			if (item != null && item.getType() != Material.AIR) {
 				GenericItem base = GenericItem.getItemBase(item);
 				if (base != null)
-					base.getType().getBuilder().assembleLore(item, item.getItemMeta(), base.getType(), base);
+					base.refreshItemLore();
 			}
 	}
 	@EventHandler(priority = EventPriority.HIGH)
@@ -314,7 +314,11 @@ public class ItemListener implements Listener {
 						}
 				}
 			}
-			if (!materialBase.getType().isAllowVanillaCrafts())
+			if (materialBase.getType().isAllowVanillaEnchanting() && ingredient.getType() == Material.ENCHANTED_BOOK) {
+				GenericItem result = GenericItem.getItemBaseNoID(e.getResult());
+				if (result != null)
+					e.setResult(result.getItem());
+			} else if (!materialBase.getType().isAllowVanillaCrafts())
 				e.setResult(new ItemStack(Material.AIR));
 		}
 		if (ingredientBase != null) {
@@ -363,7 +367,11 @@ public class ItemListener implements Listener {
 						}
 				}
 			}
-			if (!ingredientBase.getType().isAllowVanillaCrafts())
+			if (ingredientBase.getType().isAllowVanillaEnchanting() && ingredient.getType() == Material.ENCHANTED_BOOK) {
+				GenericItem result = GenericItem.getItemBaseNoID(e.getResult());
+				if (result != null)
+					e.setResult(result.getItem());
+			} else if (!ingredientBase.getType().isAllowVanillaCrafts())
 				e.setResult(new ItemStack(Material.AIR));
 		}
 	}

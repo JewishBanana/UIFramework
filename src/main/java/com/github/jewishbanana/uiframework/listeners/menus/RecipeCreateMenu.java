@@ -90,10 +90,10 @@ public class RecipeCreateMenu extends InventoryHandler {
 				this.getInventory().setItem(i, whiteGlass);
 			switch (recipeType) {
 			case "shaped":
-				recipe = new ShapedRecipe(new NamespacedKey(plugin, key), type.getBuilder().getItem());
+				recipe = new ShapedRecipe(new NamespacedKey(plugin, key), type.getItem());
 			case "shapeless":
 				if (recipe == null)
-					recipe = new ShapelessRecipe(new NamespacedKey(plugin, key), type.getBuilder().getItem());
+					recipe = new ShapelessRecipe(new NamespacedKey(plugin, key), type.getItem());
 				for (int i=0; i < 45; i++)
 					if (i % 9 < 5)
 						this.getInventory().setItem(i, greenGlass);

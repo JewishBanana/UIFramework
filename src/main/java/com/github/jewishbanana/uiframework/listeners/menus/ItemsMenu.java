@@ -55,7 +55,7 @@ public class ItemsMenu extends InventoryHandler {
 		        break;
 			if (i != start && i % 7 == 0)
 				c += 2;
-			GenericItem base = GenericItem.getItemBaseNoID(entry.getValue().getBuilder().getItem());
+			GenericItem base = GenericItem.getItemBaseNoID(entry.getValue().getItem());
 			ItemStack temp = base.stripItemID().getItem();
 			ItemMeta tempMeta = temp.getItemMeta();
 			List<String> lore = tempMeta.getLore();
@@ -71,8 +71,11 @@ public class ItemsMenu extends InventoryHandler {
 					if (p.getInventory().firstEmpty() == -1)
 						p.sendMessage(UIFUtils.convertString("&cYour inventory is full!"));
 					else {
-						p.getInventory().addItem(base.getType().getBuilder().getItem());
-						p.sendMessage(UIFUtils.convertString("&aGave &b1 &a["+base.getDisplayName()+"&a] to "+p.getName()));
+						ItemStack item = entry.getValue().getItem();
+						GenericItem giveBase = GenericItem.getItemBase(item);
+						giveBase.refreshItemLore();
+						p.getInventory().addItem(giveBase.getItem());
+						p.sendMessage(UIFUtils.convertString("&aGave &b1 &a["+giveBase.getDisplayName()+"&a] to "+p.getName()));
 						p.playSound(p.getLocation(), Sound.ENTITY_ITEM_PICKUP, 1, 1);
 					}
 					return;
