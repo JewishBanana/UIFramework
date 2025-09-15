@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
@@ -32,9 +33,11 @@ import org.bukkit.event.player.PlayerItemConsumeEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.plugin.PluginManager;
 import org.bukkit.potion.PotionEffectType;
 
 import com.github.jewishbanana.uiframework.UIFramework;
+import com.github.jewishbanana.uiframework.events.EnchantTriggerEvent;
 import com.github.jewishbanana.uiframework.items.Ability;
 import com.github.jewishbanana.uiframework.items.ActivatedSlot;
 import com.github.jewishbanana.uiframework.items.GenericItem;
@@ -46,6 +49,8 @@ public class AbilityListener implements Listener {
 	
 	private static Map<UUID, Pair<GenericItem, GenericItem>> itemProjectiles = new HashMap<>();
 	private static Map<UUID, Pair<Ability, GenericItem>> abilityProjectiles = new HashMap<>();
+	
+	private PluginManager manager = Bukkit.getServer().getPluginManager();
 
 	public AbilityListener(UIFramework plugin) {
 		plugin.getServer().getPluginManager().registerEvents(this, plugin);
@@ -61,11 +66,14 @@ public class AbilityListener implements Listener {
 				boolean flag = k.isAlwaysAllowAbilities();
 				if (UIFUtils.isActivatingSlot(v, k.getActivatingSlot(), hand, k))
 					flag = k.interacted(event);
-				if (!k.getEnchants().isEmpty())
-					k.getEnchants().forEach(enchant -> {
-						if (UIFUtils.isActivatingSlot(v, enchant.getActivatingSlot(), hand, k))
-							enchant.interacted(event, k);
-					});
+				k.getEnchants().forEach((enchant, level) -> {
+					if (UIFUtils.isActivatingSlot(v, enchant.getActivatingSlot(), hand, k)) {
+						EnchantTriggerEvent enchantTrigger = new EnchantTriggerEvent(enchant, Ability.Action.INTERACTION, k, event.getPlayer());
+						manager.callEvent(enchantTrigger);
+						if (!enchantTrigger.isCancelled())
+							enchantTrigger.getEnchant().interacted(event, enchantTrigger.getBaseItem());
+					}
+				});
 				if (flag)
 					switch (event.getAction()) {
 					case LEFT_CLICK_BLOCK:
@@ -91,10 +99,8 @@ public class AbilityListener implements Listener {
 					}
 			});
 	}
-	@EventHandler(priority = EventPriority.HIGH)
+	@EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
 	public void onInteractEntity(PlayerInteractEntityEvent event) {
-		if (event.isCancelled())
-			return;
 		ActivatedSlot hand = event.getHand() == EquipmentSlot.HAND ? ActivatedSlot.MAIN_HAND : ActivatedSlot.OFF_HAND;
 		Map<GenericItem, ActivatedSlot> map = UIFUtils.getEntityContents(event.getPlayer());
 		if (!map.isEmpty())
@@ -102,19 +108,20 @@ public class AbilityListener implements Listener {
 				boolean flag = k.isAlwaysAllowAbilities();
 				if (UIFUtils.isActivatingSlot(v, k.getActivatingSlot(), hand, k))
 					flag = k.interactedEntity(event);
-				if (!k.getEnchants().isEmpty())
-					k.getEnchants().forEach(e -> {
-						if (UIFUtils.isActivatingSlot(v, k.getActivatingSlot(), hand, k))
-							e.interactedEntity(event, k);
-					});
+				k.getEnchants().forEach((enchant, level) -> {
+					if (UIFUtils.isActivatingSlot(v, k.getActivatingSlot(), hand, k)) {
+						EnchantTriggerEvent enchantTrigger = new EnchantTriggerEvent(enchant, Ability.Action.INTERACT_ENTITY, k, event.getPlayer());
+						manager.callEvent(enchantTrigger);
+						if (!enchantTrigger.isCancelled())
+							enchantTrigger.getEnchant().interactedEntity(event, enchantTrigger.getBaseItem());
+					}
+				});
 				if (flag)
 					k.getType().simulateAction(Ability.Action.INTERACT_ENTITY, event, k, v, hand);
 			});
 	}
-	@EventHandler(priority = EventPriority.HIGH)
+	@EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
 	public void onHitEntity(EntityDamageByEntityEvent event) {
-		if (event.isCancelled())
-			return;
 		if (event.getDamager() instanceof Projectile && itemProjectiles.containsKey(event.getDamager().getUniqueId())) {
 			Pair<GenericItem, GenericItem> pair = itemProjectiles.remove(event.getDamager().getUniqueId());
 			if (pair.getSecond() != null && pair.getSecond().getType().getProjectileDamage() != 0.0)
@@ -150,11 +157,14 @@ public class AbilityListener implements Listener {
 					boolean flag = k.isAlwaysAllowAbilities();
 					if (UIFUtils.isActivatingSlot(v, k.getActivatingSlot(), ActivatedSlot.MAIN_HAND, k))
 						flag = k.hitEntity(event);
-					if (!k.getEnchants().isEmpty())
-						k.getEnchants().forEach(e -> {
-							if (UIFUtils.isActivatingSlot(v, k.getActivatingSlot(), ActivatedSlot.MAIN_HAND, k))
-								e.hitEntity(event, k);
-						});
+					k.getEnchants().forEach((enchant, level) -> {
+						if (UIFUtils.isActivatingSlot(v, k.getActivatingSlot(), ActivatedSlot.MAIN_HAND, k)) {
+							EnchantTriggerEvent enchantTrigger = new EnchantTriggerEvent(enchant, Ability.Action.HIT_ENTITY, k, event.getDamager());
+							manager.callEvent(enchantTrigger);
+							if (!enchantTrigger.isCancelled())
+								enchantTrigger.getEnchant().hitEntity(event, enchantTrigger.getBaseItem());
+						}
+					});
 					if (flag)
 						k.getType().simulateAction(Ability.Action.HIT_ENTITY, event, k, v);
 				});
@@ -169,43 +179,50 @@ public class AbilityListener implements Listener {
 					boolean flag = k.isAlwaysAllowAbilities();
 					if (UIFUtils.isActivatingSlot(v, k.getActivatingSlot(), ActivatedSlot.ARMOR, k))
 						flag = k.wasHit(event);
-					if (!k.getEnchants().isEmpty())
-						k.getEnchants().forEach(e -> {
-							if (UIFUtils.isActivatingSlot(v, k.getActivatingSlot(), ActivatedSlot.ARMOR, k))
-								e.wasHit(event, k);
-						});
+					k.getEnchants().forEach((enchant, level) -> {
+						if (UIFUtils.isActivatingSlot(v, k.getActivatingSlot(), ActivatedSlot.ARMOR, k)) {
+							EnchantTriggerEvent enchantTrigger = new EnchantTriggerEvent(enchant, Ability.Action.WAS_HIT, k, event.getEntity());
+							manager.callEvent(enchantTrigger);
+							if (!enchantTrigger.isCancelled())
+								enchantTrigger.getEnchant().wasHit(event, enchantTrigger.getBaseItem());
+						}
+					});
 					if (flag)
 						k.getType().simulateAction(Ability.Action.WAS_HIT, event, k, v);
 				});
 		}
 	}
-	@EventHandler(priority = EventPriority.HIGH)
+	@EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
 	public void onProjectileThrown(ProjectileLaunchEvent event) {
-		if (event.isCancelled())
-			return;
 		if (event.getEntity() instanceof ThrowableProjectile) {
 			GenericItem base = GenericItem.getItemBase(((ThrowableProjectile) event.getEntity()).getItem());
 			if (base != null) {
 				boolean flag = base.projectileThrown(event);
-				if (!base.getEnchants().isEmpty())
-					base.getEnchants().forEach(e -> e.projectileThrown(event, base));
+				base.getEnchants().forEach((enchant, level) -> {
+					EnchantTriggerEvent enchantTrigger = new EnchantTriggerEvent(enchant, Ability.Action.WAS_THROWN, base, event.getEntity());
+					manager.callEvent(enchantTrigger);
+					if (!enchantTrigger.isCancelled())
+						enchantTrigger.getEnchant().projectileThrown(event, enchantTrigger.getBaseItem());
+				});
 				if (flag)
 					base.getType().simulateAction(Ability.Action.WAS_THROWN, event, base);
 				itemProjectiles.put(event.getEntity().getUniqueId(), Pair.of(null, base));
 			}
 		}
 	}
-	@EventHandler(priority = EventPriority.HIGH)
+	@EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
 	public void onProjectileHit(ProjectileHitEvent event) {
-		if (event.isCancelled())
-			return;
 		if (event.getEntity() instanceof ThrowableProjectile) {
 			ItemStack item = ((ThrowableProjectile) event.getEntity()).getItem();
 			GenericItem base = GenericItem.getItemBase(item);
 			if (base != null) {
 				boolean flag = base.projectileHit(event);
-				if (!base.getEnchants().isEmpty())
-					base.getEnchants().forEach(e -> e.projectileHit(event, base));
+				base.getEnchants().forEach((enchant, level) -> {
+					EnchantTriggerEvent enchantTrigger = new EnchantTriggerEvent(enchant, Ability.Action.PROJECTILE_HIT, base, event.getEntity());
+					manager.callEvent(enchantTrigger);
+					if (!enchantTrigger.isCancelled())
+						enchantTrigger.getEnchant().projectileHit(event, enchantTrigger.getBaseItem());
+				});
 				if (flag)
 					base.getType().simulateAction(Ability.Action.PROJECTILE_HIT, event, base, null);
 			}
@@ -215,16 +232,24 @@ public class AbilityListener implements Listener {
 				GenericItem base = itemPair.getFirst();
 				if (base != null) {
 					boolean flag = base.projectileHit(event);
-					if (!base.getEnchants().isEmpty())
-						base.getEnchants().forEach(e -> e.projectileHit(event, itemPair.getFirst()));
+					base.getEnchants().forEach((enchant, level) -> {
+						EnchantTriggerEvent enchantTrigger = new EnchantTriggerEvent(enchant, Ability.Action.PROJECTILE_HIT, itemPair.getFirst(), event.getEntity());
+						manager.callEvent(enchantTrigger);
+						if (!enchantTrigger.isCancelled())
+							enchantTrigger.getEnchant().projectileHit(event, enchantTrigger.getBaseItem());
+					});
 					if (flag)
 						base.getType().simulateAction(Ability.Action.PROJECTILE_HIT, event, base, null);
 				}
 				base = itemPair.getSecond();
 				if (base != null) {
 					boolean flag = base.projectileHit(event);
-					if (!base.getEnchants().isEmpty())
-						base.getEnchants().forEach(e -> e.projectileHit(event, itemPair.getSecond()));
+					base.getEnchants().forEach((enchant, level) -> {
+						EnchantTriggerEvent enchantTrigger = new EnchantTriggerEvent(enchant, Ability.Action.PROJECTILE_HIT, itemPair.getSecond(), event.getEntity());
+						manager.callEvent(enchantTrigger);
+						if (!enchantTrigger.isCancelled())
+							enchantTrigger.getEnchant().projectileHit(event, enchantTrigger.getBaseItem());
+					});
 					if (flag)
 						base.getType().simulateAction(Ability.Action.PROJECTILE_HIT, event, base, null);
 				}
@@ -240,93 +265,110 @@ public class AbilityListener implements Listener {
 					boolean flag = k.isAlwaysAllowAbilities();
 					if (UIFUtils.isActivatingSlot(v, k.getActivatingSlot(), ActivatedSlot.ARMOR, k))
 						flag = k.hitByProjectile(event);
-					if (!k.getEnchants().isEmpty())
-						k.getEnchants().forEach(e -> {
-							if (UIFUtils.isActivatingSlot(v, k.getActivatingSlot(), ActivatedSlot.ARMOR, k))
-								e.hitByProjectile(event, k);
-						});
+					k.getEnchants().forEach((enchant, level) -> {
+						if (UIFUtils.isActivatingSlot(v, k.getActivatingSlot(), ActivatedSlot.ARMOR, k)) {
+							EnchantTriggerEvent enchantTrigger = new EnchantTriggerEvent(enchant, Ability.Action.HIT_BY_PROJECTILE, k, event.getHitEntity());
+							manager.callEvent(enchantTrigger);
+							if (!enchantTrigger.isCancelled())
+								enchantTrigger.getEnchant().hitByProjectile(event, enchantTrigger.getBaseItem());
+						}
+					});
 					if (flag)
 						k.getType().simulateAction(Ability.Action.HIT_BY_PROJECTILE, event, k, v);
 				});
 		}
 	}
-	@EventHandler(priority = EventPriority.HIGH)
+	@EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
 	public void onBowShot(EntityShootBowEvent event) {
-		if (event.isCancelled())
-			return;
 		GenericItem base = GenericItem.getItemBase(event.getBow());
 		GenericItem arrow = event.shouldConsumeItem() ? GenericItem.getItemBase(event.getConsumable()) : null;
 		if (base != null) {
 			boolean flag = base.shotBow(event);
-			if (!base.getEnchants().isEmpty())
-				base.getEnchants().forEach(e -> e.shotBow(event, base));
+			base.getEnchants().forEach((enchant, level) -> {
+				EnchantTriggerEvent enchantTrigger = new EnchantTriggerEvent(enchant, Ability.Action.SHOT_BOW, base, event.getEntity());
+				manager.callEvent(enchantTrigger);
+				if (!enchantTrigger.isCancelled())
+					enchantTrigger.getEnchant().shotBow(event, enchantTrigger.getBaseItem());
+			});
 			if (flag)
 				base.getType().simulateAction(Ability.Action.SHOT_BOW, event, base);
 		}
 		if (base != null || arrow != null)
 			itemProjectiles.put(event.getProjectile().getUniqueId(), Pair.of(base, arrow));
 	}
-	@EventHandler(priority = EventPriority.HIGH)
+	@EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
 	public void onInventoryClick(InventoryClickEvent event) {
-		if (event.isCancelled() || event.getCurrentItem() == null || event.getCurrentItem().getType() == Material.AIR)
+		if (event.getCurrentItem() == null || event.getCurrentItem().getType() == Material.AIR)
 			return;
 		GenericItem base = GenericItem.getItemBase(event.getCurrentItem());
 		if (base != null) {
 			boolean flag = base.inventoryClick(event);
-			if (!base.getEnchants().isEmpty())
-				base.getEnchants().forEach(e -> e.inventoryClick(event, base));
+			base.getEnchants().forEach((enchant, level) -> {
+				EnchantTriggerEvent enchantTrigger = new EnchantTriggerEvent(enchant, Ability.Action.INVENTORY_CLICK, base, event.getWhoClicked());
+				manager.callEvent(enchantTrigger);
+				if (!enchantTrigger.isCancelled())
+					enchantTrigger.getEnchant().inventoryClick(event, enchantTrigger.getBaseItem());
+			});
 			if (flag)
 				base.getType().simulateAction(Ability.Action.INVENTORY_CLICK, event, base);
 		}
 	}
-	@EventHandler(priority = EventPriority.HIGH)
+	@EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
 	public void onConsumption(PlayerItemConsumeEvent event) {
-		if (event.isCancelled())
-			return;
 		GenericItem base = GenericItem.getItemBase(event.getItem());
 		if (base != null) {
 			boolean flag = base.consumeItem(event);
-			if (!base.getEnchants().isEmpty())
-				base.getEnchants().forEach(e -> e.consumeItem(event, base));
+			base.getEnchants().forEach((enchant, level) -> {
+				EnchantTriggerEvent enchantTrigger = new EnchantTriggerEvent(enchant, Ability.Action.CONSUME, base, event.getPlayer());
+				manager.callEvent(enchantTrigger);
+				if (!enchantTrigger.isCancelled())
+					enchantTrigger.getEnchant().consumeItem(event, enchantTrigger.getBaseItem());
+			});
 			if (flag)
 				base.getType().simulateAction(Ability.Action.CONSUME, event, base);
 		}
 	}
-	@EventHandler(priority = EventPriority.HIGH)
+	@EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
 	public void onSplashPotion(PotionSplashEvent event) {
-		if (event.isCancelled())
-			return;
 		GenericItem base = GenericItem.getItemBase(event.getPotion().getItem());
 		if (base != null) {
 			boolean flag = base.splashPotion(event);
-			if (!base.getEnchants().isEmpty())
-				base.getEnchants().forEach(e -> e.splashPotion(event, base));
+			base.getEnchants().forEach((enchant, level) -> {
+				EnchantTriggerEvent enchantTrigger = new EnchantTriggerEvent(enchant, Ability.Action.SPLASH_POTION, base, event.getPotion());
+				manager.callEvent(enchantTrigger);
+				if (!enchantTrigger.isCancelled())
+					enchantTrigger.getEnchant().splashPotion(event, enchantTrigger.getBaseItem());
+			});
 			if (flag)
 				base.getType().simulateAction(Ability.Action.SPLASH_POTION, event, base);
 		}
 	}
-	@EventHandler(priority = EventPriority.HIGH)
+	@EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
 	public void onItemDrop(EntityDropItemEvent event) {
-		if (event.isCancelled())
-			return;
 		GenericItem base = GenericItem.getItemBase(event.getItemDrop().getItemStack());
 		if (base != null) {
 			boolean flag = base.dropItem(event);
-			if (!base.getEnchants().isEmpty())
-				base.getEnchants().forEach(e -> e.dropItem(event, base));
+			base.getEnchants().forEach((enchant, level) -> {
+				EnchantTriggerEvent enchantTrigger = new EnchantTriggerEvent(enchant, Ability.Action.DROP_ITEM, base, event.getEntity());
+				manager.callEvent(enchantTrigger);
+				if (!enchantTrigger.isCancelled())
+					enchantTrigger.getEnchant().dropItem(event, enchantTrigger.getBaseItem());
+			});
 			if (flag)
 				base.getType().simulateAction(Ability.Action.DROP_ITEM, event, base);
 		}
 	}
-	@EventHandler(priority = EventPriority.HIGH)
+	@EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
 	public void onItemPickup(EntityPickupItemEvent event) {
-		if (event.isCancelled())
-			return;
 		GenericItem base = GenericItem.getItemBase(event.getItem().getItemStack());
 		if (base != null) {
 			boolean flag = base.pickupItem(event);
-			if (!base.getEnchants().isEmpty())
-				base.getEnchants().forEach(e -> e.pickupItem(event, base));
+			base.getEnchants().forEach((enchant, level) -> {
+				EnchantTriggerEvent enchantTrigger = new EnchantTriggerEvent(enchant, Ability.Action.PICKUP_ITEM, base, event.getEntity());
+				manager.callEvent(enchantTrigger);
+				if (!enchantTrigger.isCancelled())
+					enchantTrigger.getEnchant().pickupItem(event, enchantTrigger.getBaseItem());
+			});
 			if (flag)
 				base.getType().simulateAction(Ability.Action.PICKUP_ITEM, event, base);
 		}
@@ -337,8 +379,12 @@ public class AbilityListener implements Listener {
 			boolean flag = k.isAlwaysAllowAbilities();
 			if (UIFUtils.isActivatingSlot(v, k.getActivatingSlot(), ActivatedSlot.ANY, k))
 				flag = k.entityDeath(event);
-			if (!k.getEnchants().isEmpty())
-				k.getEnchants().forEach(e -> e.entityDeath(event, k));
+			k.getEnchants().forEach((enchant, level) -> {
+				EnchantTriggerEvent enchantTrigger = new EnchantTriggerEvent(enchant, Ability.Action.ENTITY_DEATH, k, event.getEntity());
+				manager.callEvent(enchantTrigger);
+				if (!enchantTrigger.isCancelled())
+					enchantTrigger.getEnchant().entityDeath(event, enchantTrigger.getBaseItem());
+			});
 			if (flag)
 				k.getType().simulateAction(Ability.Action.ENTITY_DEATH, event, k, v);
 		});
@@ -349,34 +395,42 @@ public class AbilityListener implements Listener {
 			boolean flag = k.isAlwaysAllowAbilities();
 			if (UIFUtils.isActivatingSlot(v, k.getActivatingSlot(), ActivatedSlot.ANY, k))
 				flag = k.entityRespawn(event);
-			if (!k.getEnchants().isEmpty())
-				k.getEnchants().forEach(e -> e.entityRespawn(event, k));
+			k.getEnchants().forEach((enchant, level) -> {
+				EnchantTriggerEvent enchantTrigger = new EnchantTriggerEvent(enchant, Ability.Action.ENTITY_RESPAWN, k, event.getPlayer());
+				manager.callEvent(enchantTrigger);
+				if (!enchantTrigger.isCancelled())
+					enchantTrigger.getEnchant().entityRespawn(event, enchantTrigger.getBaseItem());
+			});
 			if (flag)
 				k.getType().simulateAction(Ability.Action.ENTITY_RESPAWN, event, k, v);
 		});
 	}
-	@EventHandler(priority = EventPriority.HIGH)
+	@EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
 	public void onPlaceBlock(BlockPlaceEvent event) {
-		if (event.isCancelled())
-			return;
 		GenericItem base = GenericItem.getItemBase(event.getItemInHand());
 		if (base != null) {
 			boolean flag = base.placeBlock(event);
-			if (!base.getEnchants().isEmpty())
-				base.getEnchants().forEach(e -> e.placeBlock(event, base));
+			base.getEnchants().forEach((enchant, level) -> {
+				EnchantTriggerEvent enchantTrigger = new EnchantTriggerEvent(enchant, Ability.Action.PLACE_BLOCK, base, event.getPlayer());
+				manager.callEvent(enchantTrigger);
+				if (!enchantTrigger.isCancelled())
+					enchantTrigger.getEnchant().placeBlock(event, enchantTrigger.getBaseItem());
+			});
 			if (flag)
 				base.getType().simulateAction(Ability.Action.PLACE_BLOCK, event, base, event.getHand() == EquipmentSlot.HAND ? ActivatedSlot.MAIN_HAND : ActivatedSlot.OFF_HAND);
 		}
 	}
-	@EventHandler(priority = EventPriority.HIGH)
+	@EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
 	public void onBreakBlock(BlockBreakEvent event) {
-		if (event.isCancelled())
-			return;
 		GenericItem base = GenericItem.getItemBase(event.getPlayer().getEquipment().getItemInMainHand());
 		if (base != null) {
 			boolean flag = base.breakBlock(event);
-			if (!base.getEnchants().isEmpty())
-				base.getEnchants().forEach(e -> e.breakBlock(event, base));
+			base.getEnchants().forEach((enchant, level) -> {
+				EnchantTriggerEvent enchantTrigger = new EnchantTriggerEvent(enchant, Ability.Action.BREAK_BLOCK, base, event.getPlayer());
+				manager.callEvent(enchantTrigger);
+				if (!enchantTrigger.isCancelled())
+					enchantTrigger.getEnchant().breakBlock(event, enchantTrigger.getBaseItem());
+			});
 			if (flag)
 				base.getType().simulateAction(Ability.Action.BREAK_BLOCK, event, base, ActivatedSlot.MAIN_HAND);
 		}

@@ -7,8 +7,10 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 
+import org.bukkit.Bukkit;
 import org.bukkit.Keyed;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -30,10 +32,13 @@ import org.bukkit.event.player.PlayerItemConsumeEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.Recipe;
+import org.bukkit.inventory.RecipeChoice;
 import org.bukkit.inventory.ShapedRecipe;
 import org.bukkit.inventory.ShapelessRecipe;
+import org.bukkit.plugin.PluginManager;
 
 import com.github.jewishbanana.uiframework.UIFramework;
+import com.github.jewishbanana.uiframework.events.AbilityTriggerEvent;
 import com.github.jewishbanana.uiframework.items.Ability.Action;
 import com.github.jewishbanana.uiframework.utils.AnvilRecipe;
 import com.github.jewishbanana.uiframework.utils.UIFDataUtils;
@@ -41,15 +46,16 @@ import com.github.jewishbanana.uiframework.utils.UIFUtils;
 import com.mojang.datafixers.util.Pair;
 
 @SuppressWarnings("deprecation")
-public class ItemType {
+public class UIItemType {
 
-	private static UIFramework plugin;
-	private static Map<String, ItemType> itemsMap;
+	private static final UIFramework plugin;
+	private static final Map<String, UIItemType> registry;
+	private static final PluginManager manager = Bukkit.getServer().getPluginManager();
 	static {
 		plugin = UIFramework.getInstance();
-		itemsMap = new LinkedHashMap<>();
+		registry = new LinkedHashMap<>();
 		
-		itemsMap.put("_null", new ItemType(GenericItem.class, "_null"));
+		registry.put("_null", createItemType(GenericItem.class, "_null"));
 	}
 	
 	private Class<? extends GenericItem> instance;
@@ -70,20 +76,24 @@ public class ItemType {
 	protected Map<UIEnchantment, Integer> enchants = new LinkedHashMap<>();
 	
 	private List<Recipe> recipes = new ArrayList<>();
-	private List<AnvilRecipe> anvilRecipes = new ArrayList<>();
 	private List<Recipe> usedRecipes = new ArrayList<>();
 	
-	private ItemType(Class<? extends GenericItem> instance, String registeredName) {
+	private UIItemType(Class<? extends GenericItem> instance, String registeredName) {
 		this.instance = instance;
 		this.registeredName = registeredName;
-		
+	}
+	private static UIItemType createItemType(Class<? extends GenericItem> instance, String registeredName) {
+		UIItemType type = new UIItemType(instance, registeredName);
 		try {
 			GenericItem base = instance.getDeclaredConstructor(ItemStack.class).newInstance(new ItemStack(Material.EGG));
-			this.builder = base.setType(this).createItem().attachID(registeredName).build();
-			this.durability = builder.getItem().getType().getMaxDurability();
-			this.itemCategory = base.getItemCategory();
+			type.builder = base.setType(type).createItem().attachID(registeredName).build();
+			type.durability = type.builder.getItem().getType().getMaxDurability();
+			type.itemCategory = base.getItemCategory();
+			return type;
 		} catch (Exception e) {
 			e.printStackTrace();
+			UIFramework.consoleSender.sendMessage(UIFUtils.convertString("&e[UIFramework]: An error has occurred above this message while trying to register custom item &d"+registeredName+" &e! This is NOT a UIFramework bug! Report this to the proper plugin author(s) of the related item."));
+			return null;
 		}
 	}
 	/**
@@ -96,17 +106,19 @@ public class ItemType {
 	 * @param silentFail If this should not throw an exception in case of already existing registry
 	 * @return The ItemType instance created (or null if silent failed)
 	 */
-	public static ItemType registerItem(String name, Class<? extends GenericItem> instance, boolean silentFail) {
-		if (itemsMap.containsKey(name)) {
+	public static UIItemType registerItem(String name, Class<? extends GenericItem> instance, boolean silentFail) {
+		if (registry.containsKey(name)) {
 			if (silentFail)
 				return null;
 			throw new IllegalArgumentException("[UIFramework]: Cannot register item with name '"+name+"' as an item with that name is already registered!");
 		}
 		if (!UIFramework.dataFile.contains("item."+name))
 			UIFramework.dataFile.createSection("item."+name);
-		ItemType type = new ItemType(instance, name);
+		UIItemType type = createItemType(instance, name);
+		if (type == null)
+			return null;
 		type.dataPath = "item."+name;
-		itemsMap.put(name, type);
+		registry.put(name, type);
 		return type;
 	}
 	/**
@@ -118,7 +130,7 @@ public class ItemType {
 	 * @param instance The associated class of your custom item
 	 * @return The ItemType instance created
 	 */
-	public static ItemType registerItem(String name, Class<? extends GenericItem> instance) {
+	public static UIItemType registerItem(String name, Class<? extends GenericItem> instance) {
 		return registerItem(name, instance, false);
 	}
 	/**
@@ -127,12 +139,14 @@ public class ItemType {
 	@Deprecated
 	public static void registerDefaults() {
 		Map<String, Pair<String, ConfigurationSection>> recipeNames = new LinkedHashMap<>();
-		for (String s : UIFramework.dataFile.getConfigurationSection("item").getKeys(false))
-			if (UIFramework.dataFile.contains("item."+s+".recipes"))
-				for (String path : UIFramework.dataFile.getConfigurationSection("item."+s+".recipes").getKeys(false))
-					recipeNames.put(path, Pair.of(s, UIFramework.dataFile.getConfigurationSection("item."+s+".recipes."+path)));
+		for (String s : UIFramework.dataFile.getConfigurationSection("item").getKeys(false)) {
+			ConfigurationSection section = UIFramework.dataFile.getConfigurationSection("item."+s+".recipes");
+			if (section != null)
+				for (String path : section.getKeys(false))
+					recipeNames.put(path, Pair.of(s, section.getConfigurationSection(path)));
+		}
 		plugin.getServer().getScheduler().runTaskLater(plugin, () -> recipeNames.forEach((k, v) -> {
-			ItemType type = getItemType(v.getFirst());
+			UIItemType type = getItemType(v.getFirst());
 			if (type != null) {
 				GenericItem base = GenericItem.getItemBaseNoID(type.getItem());
 				type.addRecipe(UIFDataUtils.createRecipeFromSection(v.getSecond(), base.getItem(), new NamespacedKey(plugin, k)));
@@ -171,43 +185,84 @@ public class ItemType {
 		addRecipe(shapelessRecipe);
 	}
 	/**
-	 * Register a AnvilRecipe for this ItemType
+	 * Register an AnvilRecipe for this ItemType
 	 * 
 	 * @param recipe The recipe to add
 	 */
 	public void registerRecipe(AnvilRecipe recipe) {
 		if (recipe == null)
 			return;
-		this.anvilRecipes.add(recipe);
+		GenericItem base = GenericItem.getItemBaseNoID(builder.getItem());
+		enchants.forEach((k, v) -> k.loadEnchant(base));
+		base.refreshItemLore();
+		AnvilRecipe anvilRecipe = recipe.getResult() != null ? new AnvilRecipe(new NamespacedKey(plugin, recipe.getKey().getKey()), recipe.getAnvilChoice(), base.getItem(), recipe.getLevelCost()) : recipe;
+		addRecipe(anvilRecipe);
+	}
+	/**
+	 * Updates this resulting item in all of its crafting recipes. Call this if you modify the item after registration in your plugin
+	 * <p>
+	 * <STRONG>This is automatically handled if the user reloads through UIFramework!</STRONG>
+	 */
+	public void updateRecipeResults() {
+		List<Recipe> newList = new ArrayList<>(recipes);
+		recipes.clear();
+		for (Recipe recipe : newList) {
+			plugin.getServer().removeRecipe(((Keyed) recipe).getKey());
+			if (recipe instanceof ShapedRecipe temp)
+				registerRecipe(temp);
+			else if (recipe instanceof ShapelessRecipe temp)
+				registerRecipe(temp);
+			else if (recipe instanceof AnvilRecipe temp)
+				registerRecipe(temp);
+		}
 	}
 	private <T extends Recipe & Keyed> void addRecipe(T recipe) {
-		if (!itemsMap.containsValue(this))
+		if (!registry.containsValue(this))
 			throw new IllegalArgumentException("[UIFramework]: Cannot register recipe because the ItemType is not registered!");
-		if (plugin.getServer().getRecipe(recipe.getKey()) == null) {
-			if (UIFramework.dataFile.contains(this.dataPath+".removed_recipes") && UIFramework.dataFile.getStringList(this.dataPath+".removed_recipes").contains(recipe.getKey().getKey()))
-				return;
-			this.recipes.add(recipe);
+		if (plugin.getServer().getRecipe(recipe.getKey()) != null)
+			return;
+		if (UIFramework.dataFile.contains(this.dataPath+".removed_recipes") && UIFramework.dataFile.getStringList(this.dataPath+".removed_recipes").contains(recipe.getKey().getKey()))
+			return;
+		this.recipes.add(recipe);
+		boolean writeRecipe = true;
+		if (recipe instanceof ShapedRecipe) {
+			((ShapedRecipe) recipe).getChoiceMap().forEach((k, v) -> {
+				if (v == null)
+					return;
+				GenericItem tempBase = GenericItem.getItemBaseNoID(v.getItemStack());
+				if (tempBase != null && !tempBase.getType().usedRecipes.contains(recipe))
+					tempBase.getType().usedRecipes.add(recipe);
+			});
 			plugin.getServer().addRecipe(recipe);
-			if (!UIFramework.dataFile.contains(this.dataPath+".recipes."+recipe.getKey().getKey())) {
-				if (!UIFramework.dataFile.contains(this.dataPath+".recipes"))
-					UIFramework.dataFile.createSection(this.dataPath+".recipes");
-				UIFramework.dataFile.createSection(this.dataPath+".recipes."+recipe.getKey().getKey());
-				UIFDataUtils.writeRecipeToSection(UIFramework.dataFile, recipe, this.dataPath+".recipes."+recipe.getKey().getKey());
-			}
-			if (recipe instanceof ShapedRecipe)
-				((ShapedRecipe) recipe).getChoiceMap().forEach((k, v) -> {
-					if (v == null)
-						return;
-					GenericItem tempBase = GenericItem.getItemBaseNoID(v.getItemStack());
+		} else if (recipe instanceof ShapelessRecipe) {
+			((ShapelessRecipe) recipe).getChoiceList().forEach(k -> {
+				GenericItem tempBase = GenericItem.getItemBaseNoID(k.getItemStack());
+				if (tempBase != null && !tempBase.getType().usedRecipes.contains(recipe))
+					tempBase.getType().usedRecipes.add(recipe);
+			});
+			plugin.getServer().addRecipe(recipe);
+		} else if (recipe instanceof AnvilRecipe) {
+			AnvilRecipe anvilRecipe = (AnvilRecipe) recipe;
+			if (anvilRecipe.getAnvilChoice().getFirstSlot() instanceof RecipeChoice.ExactChoice)
+				((RecipeChoice.ExactChoice) anvilRecipe.getAnvilChoice().getFirstSlot()).getChoices().forEach(k -> {
+					GenericItem tempBase = GenericItem.getItemBaseNoID(k);
 					if (tempBase != null && !tempBase.getType().usedRecipes.contains(recipe))
 						tempBase.getType().usedRecipes.add(recipe);
 				});
-			else if (recipe instanceof ShapelessRecipe)
-				((ShapelessRecipe) recipe).getChoiceList().forEach(k -> {
-					GenericItem tempBase = GenericItem.getItemBaseNoID(k.getItemStack());
+			if (anvilRecipe.getAnvilChoice().getSecondSlot() instanceof RecipeChoice.ExactChoice)
+				((RecipeChoice.ExactChoice) anvilRecipe.getAnvilChoice().getSecondSlot()).getChoices().forEach(k -> {
+					GenericItem tempBase = GenericItem.getItemBaseNoID(k);
 					if (tempBase != null && !tempBase.getType().usedRecipes.contains(recipe))
 						tempBase.getType().usedRecipes.add(recipe);
 				});
+			if (anvilRecipe.getResult() == null && !anvilRecipe.isRepair())
+				writeRecipe = false;
+			UIFramework.registerAnvilRecipe(anvilRecipe);
+		}
+		if (writeRecipe && !UIFramework.dataFile.contains(this.dataPath+".recipes."+recipe.getKey().getKey().toString())) {
+			if (!UIFramework.dataFile.contains(this.dataPath+".recipes"))
+				UIFramework.dataFile.createSection(this.dataPath+".recipes");
+			UIFDataUtils.writeRecipeToSection(UIFramework.dataFile.createSection(this.dataPath+".recipes."+recipe.getKey().getKey().toString()), recipe);
 		}
 	}
 	/**
@@ -216,7 +271,7 @@ public class ItemType {
 	 * <STRONG>This method is handled automatically by UIFramework for server restarts/reloads</STRONG>
 	 */
 	public static void cleanAbilities() {
-		itemsMap.values().forEach(i -> i.abilityMap.keySet().forEach(k -> k.clean()));
+		registry.values().forEach(i -> i.abilityMap.keySet().forEach(k -> k.clean()));
 	}
 	/**
 	 * Get an ItemType by its registered name.
@@ -224,8 +279,8 @@ public class ItemType {
 	 * @param name The registered name of the item
 	 * @return The ItemType instance or null
 	 */
-	public static ItemType getItemType(String name) {
-		return itemsMap.get(name);
+	public static UIItemType getItemType(String name) {
+		return registry.get(name);
 	}
 	/**
 	 * Creates a new GenericItem instance of this ItemType and attaches it to the given ItemStack.
@@ -244,190 +299,326 @@ public class ItemType {
 	public void simulateAction(Action action, PlayerInteractEvent event, GenericItem base, ActivatedSlot slot, ActivatedSlot hand) {
 		if (!base.uniqueAbilities.isEmpty())
 			base.uniqueAbilities.forEach((k, v) -> {
-				if (v.contains(action) && UIFUtils.isActivatingSlot(slot, k.getActivatingSlot(), hand, base))
-					k.interacted(event, base);
+				if (v.contains(action) && UIFUtils.isActivatingSlot(slot, k.getActivatingSlot(), hand, base)) {
+					AbilityTriggerEvent triggerEvent = new AbilityTriggerEvent(k, action, base, event.getPlayer());
+					manager.callEvent(triggerEvent);
+					if (!triggerEvent.isCancelled())
+						triggerEvent.getAbility().interacted(event, triggerEvent.getBaseItem());
+				}
 			});
 		abilityMap.forEach((k, v) -> {
-			if (v.contains(action) && UIFUtils.isActivatingSlot(slot, k.getActivatingSlot(), hand, base))
-				k.interacted(event, base);
+			if (v.contains(action) && UIFUtils.isActivatingSlot(slot, k.getActivatingSlot(), hand, base)) {
+				AbilityTriggerEvent triggerEvent = new AbilityTriggerEvent(k, action, base, event.getPlayer());
+				manager.callEvent(triggerEvent);
+				if (!triggerEvent.isCancelled())
+					triggerEvent.getAbility().interacted(event, triggerEvent.getBaseItem());
+			}
 		});
 	}
 	public void simulateAction(Action action, PlayerInteractEntityEvent event, GenericItem base, ActivatedSlot slot, ActivatedSlot hand) {
 		if (!base.uniqueAbilities.isEmpty())
 			base.uniqueAbilities.forEach((k, v) -> {
-				if (v.contains(action) && UIFUtils.isActivatingSlot(slot, k.getActivatingSlot(), hand, base))
-					k.interactedEntity(event, base);
+				if (v.contains(action) && UIFUtils.isActivatingSlot(slot, k.getActivatingSlot(), hand, base)) {
+					AbilityTriggerEvent triggerEvent = new AbilityTriggerEvent(k, action, base, event.getPlayer());
+					manager.callEvent(triggerEvent);
+					if (!triggerEvent.isCancelled())
+						triggerEvent.getAbility().interactedEntity(event, triggerEvent.getBaseItem());
+				}
 			});
 		abilityMap.forEach((k, v) -> {
-			if (v.contains(action) && UIFUtils.isActivatingSlot(slot, k.getActivatingSlot(), hand, base))
-				k.interactedEntity(event, base);
+			if (v.contains(action) && UIFUtils.isActivatingSlot(slot, k.getActivatingSlot(), hand, base)) {
+				AbilityTriggerEvent triggerEvent = new AbilityTriggerEvent(k, action, base, event.getPlayer());
+				manager.callEvent(triggerEvent);
+				if (!triggerEvent.isCancelled())
+					triggerEvent.getAbility().interactedEntity(event, triggerEvent.getBaseItem());
+			}
 		});
 	}
 	public void simulateAction(Action action, EntityDamageByEntityEvent event, GenericItem base, ActivatedSlot slot) {
 		if (action == Action.HIT_ENTITY) {
 			if (!base.uniqueAbilities.isEmpty())
 				base.uniqueAbilities.forEach((k, v) -> {
-					if (v.contains(action) && UIFUtils.isActivatingSlot(slot, k.getActivatingSlot(), ActivatedSlot.MAIN_HAND, base))
-						k.hitEntity(event, base);
+					if (v.contains(action) && UIFUtils.isActivatingSlot(slot, k.getActivatingSlot(), ActivatedSlot.MAIN_HAND, base)) {
+						AbilityTriggerEvent triggerEvent = new AbilityTriggerEvent(k, action, base, event.getDamager());
+						manager.callEvent(triggerEvent);
+						if (!triggerEvent.isCancelled())
+							triggerEvent.getAbility().hitEntity(event, triggerEvent.getBaseItem());
+					}
 				});
 			abilityMap.forEach((k, v) -> {
-				if (v.contains(action) && UIFUtils.isActivatingSlot(slot, k.getActivatingSlot(), ActivatedSlot.MAIN_HAND, base))
-					k.hitEntity(event, base);
+				if (v.contains(action) && UIFUtils.isActivatingSlot(slot, k.getActivatingSlot(), ActivatedSlot.MAIN_HAND, base)) {
+					AbilityTriggerEvent triggerEvent = new AbilityTriggerEvent(k, action, base, event.getDamager());
+					manager.callEvent(triggerEvent);
+					if (!triggerEvent.isCancelled())
+						triggerEvent.getAbility().hitEntity(event, triggerEvent.getBaseItem());
+				}
 			});
 		} else {
 			if (!base.uniqueAbilities.isEmpty())
 				base.uniqueAbilities.forEach((k, v) -> {
-					if (v.contains(action) && UIFUtils.isActivatingSlot(slot, k.getActivatingSlot(), ActivatedSlot.ARMOR, base))
-						k.wasHit(event, base);
+					if (v.contains(action) && UIFUtils.isActivatingSlot(slot, k.getActivatingSlot(), ActivatedSlot.ARMOR, base)) {
+						AbilityTriggerEvent triggerEvent = new AbilityTriggerEvent(k, action, base, event.getEntity());
+						manager.callEvent(triggerEvent);
+						if (!triggerEvent.isCancelled())
+							triggerEvent.getAbility().wasHit(event, triggerEvent.getBaseItem());
+					}
 				});
 			abilityMap.forEach((k, v) -> {
-				if (v.contains(action) && UIFUtils.isActivatingSlot(slot, k.getActivatingSlot(), ActivatedSlot.ARMOR, base))
-					k.wasHit(event, base);
+				if (v.contains(action) && UIFUtils.isActivatingSlot(slot, k.getActivatingSlot(), ActivatedSlot.ARMOR, base)) {
+					AbilityTriggerEvent triggerEvent = new AbilityTriggerEvent(k, action, base, event.getEntity());
+					manager.callEvent(triggerEvent);
+					if (!triggerEvent.isCancelled())
+						triggerEvent.getAbility().wasHit(event, triggerEvent.getBaseItem());
+				}
 			});
 		}
 	}
 	public void simulateAction(Action action, ProjectileLaunchEvent event, GenericItem base) {
 		if (!base.uniqueAbilities.isEmpty())
 			base.uniqueAbilities.forEach((k, v) -> {
-				if (v.contains(action))
-					k.projectileThrown(event, base);
+				if (v.contains(action)) {
+					AbilityTriggerEvent triggerEvent = new AbilityTriggerEvent(k, action, base, event.getEntity());
+					manager.callEvent(triggerEvent);
+					if (!triggerEvent.isCancelled())
+						triggerEvent.getAbility().projectileThrown(event, triggerEvent.getBaseItem());
+				}
 			});
 		abilityMap.forEach((k, v) -> {
-			if (v.contains(action))
-				k.projectileThrown(event, base);
+			if (v.contains(action)) {
+				AbilityTriggerEvent triggerEvent = new AbilityTriggerEvent(k, action, base, event.getEntity());
+				manager.callEvent(triggerEvent);
+				if (!triggerEvent.isCancelled())
+					triggerEvent.getAbility().projectileThrown(event, triggerEvent.getBaseItem());
+			}
 		});
 	}
 	public void simulateAction(Action action, ProjectileHitEvent event, GenericItem base, ActivatedSlot slot) {
 		if (action == Action.PROJECTILE_HIT) {
 			if (!base.uniqueAbilities.isEmpty())
 				base.uniqueAbilities.forEach((k, v) -> {
-					if (v.contains(action))
-						k.projectileHit(event, base);
+					if (v.contains(action)) {
+						AbilityTriggerEvent triggerEvent = new AbilityTriggerEvent(k, action, base, event.getEntity());
+						manager.callEvent(triggerEvent);
+						if (!triggerEvent.isCancelled())
+							triggerEvent.getAbility().projectileHit(event, triggerEvent.getBaseItem());
+					}
 				});
 			abilityMap.forEach((k, v) -> {
-				if (v.contains(action))
-					k.projectileHit(event, base);
+				if (v.contains(action)) {
+					AbilityTriggerEvent triggerEvent = new AbilityTriggerEvent(k, action, base, event.getEntity());
+					manager.callEvent(triggerEvent);
+					if (!triggerEvent.isCancelled())
+						triggerEvent.getAbility().projectileHit(event, triggerEvent.getBaseItem());
+				}
 			});
 		} else {
 			if (!base.uniqueAbilities.isEmpty())
 				base.uniqueAbilities.forEach((k, v) -> {
-					if (v.contains(action) && UIFUtils.isActivatingSlot(slot, k.getActivatingSlot(), ActivatedSlot.ARMOR, base))
-						k.hitByProjectile(event, base);
+					if (v.contains(action) && UIFUtils.isActivatingSlot(slot, k.getActivatingSlot(), ActivatedSlot.ARMOR, base)) {
+						AbilityTriggerEvent triggerEvent = new AbilityTriggerEvent(k, action, base, event.getHitEntity());
+						manager.callEvent(triggerEvent);
+						if (!triggerEvent.isCancelled())
+							triggerEvent.getAbility().hitByProjectile(event, triggerEvent.getBaseItem());
+					}
 				});
 			abilityMap.forEach((k, v) -> {
-				if (v.contains(action) && UIFUtils.isActivatingSlot(slot, k.getActivatingSlot(), ActivatedSlot.ARMOR, base))
-					k.hitByProjectile(event, base);
+				if (v.contains(action) && UIFUtils.isActivatingSlot(slot, k.getActivatingSlot(), ActivatedSlot.ARMOR, base)) {
+					AbilityTriggerEvent triggerEvent = new AbilityTriggerEvent(k, action, base, event.getHitEntity());
+					manager.callEvent(triggerEvent);
+					if (!triggerEvent.isCancelled())
+						triggerEvent.getAbility().hitByProjectile(event, triggerEvent.getBaseItem());
+				}
 			});
 		}
 	}
 	public void simulateAction(Action action, EntityShootBowEvent event, GenericItem base) {
 		if (!base.uniqueAbilities.isEmpty())
 			base.uniqueAbilities.forEach((k, v) -> {
-				if (v.contains(action))
-					k.shotBow(event, base);
+				if (v.contains(action)) {
+					AbilityTriggerEvent triggerEvent = new AbilityTriggerEvent(k, action, base, event.getEntity());
+					manager.callEvent(triggerEvent);
+					if (!triggerEvent.isCancelled())
+						triggerEvent.getAbility().shotBow(event, triggerEvent.getBaseItem());
+				}
 			});
 		abilityMap.forEach((k, v) -> {
-			if (v.contains(action))
-				k.shotBow(event, base);
+			if (v.contains(action)) {
+				AbilityTriggerEvent triggerEvent = new AbilityTriggerEvent(k, action, base, event.getEntity());
+				manager.callEvent(triggerEvent);
+				if (!triggerEvent.isCancelled())
+					triggerEvent.getAbility().shotBow(event, triggerEvent.getBaseItem());
+			}
 		});
 	}
 	public void simulateAction(Action action, InventoryClickEvent event, GenericItem base) {
 		if (!base.uniqueAbilities.isEmpty())
 			base.uniqueAbilities.forEach((k, v) -> {
-				if (v.contains(action))
-					k.inventoryClick(event, base);
+				if (v.contains(action)) {
+					AbilityTriggerEvent triggerEvent = new AbilityTriggerEvent(k, action, base, event.getWhoClicked());
+					manager.callEvent(triggerEvent);
+					if (!triggerEvent.isCancelled())
+						triggerEvent.getAbility().inventoryClick(event, triggerEvent.getBaseItem());
+				}
 			});
 		abilityMap.forEach((k, v) -> {
-			if (v.contains(action))
-				k.inventoryClick(event, base);
+			if (v.contains(action)) {
+				AbilityTriggerEvent triggerEvent = new AbilityTriggerEvent(k, action, base, event.getWhoClicked());
+				manager.callEvent(triggerEvent);
+				if (!triggerEvent.isCancelled())
+					triggerEvent.getAbility().inventoryClick(event, triggerEvent.getBaseItem());
+			}
 		});
 	}
 	public void simulateAction(Action action, PlayerItemConsumeEvent event, GenericItem base) {
 		if (!base.uniqueAbilities.isEmpty())
 			base.uniqueAbilities.forEach((k, v) -> {
-				if (v.contains(action))
-					k.consumeItem(event, base);
+				if (v.contains(action)) {
+					AbilityTriggerEvent triggerEvent = new AbilityTriggerEvent(k, action, base, event.getPlayer());
+					manager.callEvent(triggerEvent);
+					if (!triggerEvent.isCancelled())
+						triggerEvent.getAbility().consumeItem(event, triggerEvent.getBaseItem());
+				}
 			});
 		abilityMap.forEach((k, v) -> {
-			if (v.contains(action))
-				k.consumeItem(event, base);
+			if (v.contains(action)) {
+				AbilityTriggerEvent triggerEvent = new AbilityTriggerEvent(k, action, base, event.getPlayer());
+				manager.callEvent(triggerEvent);
+				if (!triggerEvent.isCancelled())
+					triggerEvent.getAbility().consumeItem(event, triggerEvent.getBaseItem());
+			}
 		});
 	}
 	public void simulateAction(Action action, PotionSplashEvent event, GenericItem base) {
 		if (!base.uniqueAbilities.isEmpty())
 			base.uniqueAbilities.forEach((k, v) -> {
-				if (v.contains(action))
-					k.splashPotion(event, base);
+				if (v.contains(action)) {
+					AbilityTriggerEvent triggerEvent = new AbilityTriggerEvent(k, action, base, event.getPotion());
+					manager.callEvent(triggerEvent);
+					if (!triggerEvent.isCancelled())
+						triggerEvent.getAbility().splashPotion(event, triggerEvent.getBaseItem());
+				}
 			});
 		abilityMap.forEach((k, v) -> {
-			if (v.contains(action))
-				k.splashPotion(event, base);
+			if (v.contains(action)) {
+				AbilityTriggerEvent triggerEvent = new AbilityTriggerEvent(k, action, base, event.getPotion());
+				manager.callEvent(triggerEvent);
+				if (!triggerEvent.isCancelled())
+					triggerEvent.getAbility().splashPotion(event, triggerEvent.getBaseItem());
+			}
 		});
 	}
 	public void simulateAction(Action action, EntityDropItemEvent event, GenericItem base) {
 		if (!base.uniqueAbilities.isEmpty())
 			base.uniqueAbilities.forEach((k, v) -> {
-				if (v.contains(action))
-					k.dropItem(event, base);
+				if (v.contains(action)) {
+					AbilityTriggerEvent triggerEvent = new AbilityTriggerEvent(k, action, base, event.getEntity());
+					manager.callEvent(triggerEvent);
+					if (!triggerEvent.isCancelled())
+						triggerEvent.getAbility().dropItem(event, triggerEvent.getBaseItem());
+				}
 			});
 		abilityMap.forEach((k, v) -> {
-			if (v.contains(action))
-				k.dropItem(event, base);
+			if (v.contains(action)) {
+				AbilityTriggerEvent triggerEvent = new AbilityTriggerEvent(k, action, base, event.getEntity());
+				manager.callEvent(triggerEvent);
+				if (!triggerEvent.isCancelled())
+					triggerEvent.getAbility().dropItem(event, triggerEvent.getBaseItem());
+			}
 		});
 	}
 	public void simulateAction(Action action, EntityPickupItemEvent event, GenericItem base) {
 		if (!base.uniqueAbilities.isEmpty())
 			base.uniqueAbilities.forEach((k, v) -> {
-				if (v.contains(action))
-					k.pickupItem(event, base);
+				if (v.contains(action)) {
+					AbilityTriggerEvent triggerEvent = new AbilityTriggerEvent(k, action, base, event.getEntity());
+					manager.callEvent(triggerEvent);
+					if (!triggerEvent.isCancelled())
+						triggerEvent.getAbility().pickupItem(event, triggerEvent.getBaseItem());
+				}
 			});
 		abilityMap.forEach((k, v) -> {
-			if (v.contains(action))
-				k.pickupItem(event, base);
+			if (v.contains(action)) {
+				AbilityTriggerEvent triggerEvent = new AbilityTriggerEvent(k, action, base, event.getEntity());
+				manager.callEvent(triggerEvent);
+				if (!triggerEvent.isCancelled())
+					triggerEvent.getAbility().pickupItem(event, triggerEvent.getBaseItem());
+			}
 		});
 	}
 	public void simulateAction(Action action, EntityDeathEvent event, GenericItem base, ActivatedSlot slot) {
 		if (!base.uniqueAbilities.isEmpty())
 			base.uniqueAbilities.forEach((k, v) -> {
-				if (v.contains(action) && UIFUtils.isActivatingSlot(slot, k.getActivatingSlot(), ActivatedSlot.ANY, base))
-					k.entityDeath(event, base);
+				if (v.contains(action) && UIFUtils.isActivatingSlot(slot, k.getActivatingSlot(), ActivatedSlot.ANY, base)) {
+					AbilityTriggerEvent triggerEvent = new AbilityTriggerEvent(k, action, base, event.getEntity());
+					manager.callEvent(triggerEvent);
+					if (!triggerEvent.isCancelled())
+						triggerEvent.getAbility().entityDeath(event, triggerEvent.getBaseItem());
+				}
 			});
 		abilityMap.forEach((k, v) -> {
-			if (v.contains(action) && UIFUtils.isActivatingSlot(slot, k.getActivatingSlot(), ActivatedSlot.ANY, base))
-				k.entityDeath(event, base);
+			if (v.contains(action) && UIFUtils.isActivatingSlot(slot, k.getActivatingSlot(), ActivatedSlot.ANY, base)) {
+				AbilityTriggerEvent triggerEvent = new AbilityTriggerEvent(k, action, base, event.getEntity());
+				manager.callEvent(triggerEvent);
+				if (!triggerEvent.isCancelled())
+					triggerEvent.getAbility().entityDeath(event, triggerEvent.getBaseItem());
+			}
 		});
 	}
 	public void simulateAction(Action action, PlayerRespawnEvent event, GenericItem base, ActivatedSlot slot) {
 		if (!base.uniqueAbilities.isEmpty())
 			base.uniqueAbilities.forEach((k, v) -> {
-				if (v.contains(action) && UIFUtils.isActivatingSlot(slot, k.getActivatingSlot(), ActivatedSlot.ANY, base))
-					k.entityRespawn(event, base);
+				if (v.contains(action) && UIFUtils.isActivatingSlot(slot, k.getActivatingSlot(), ActivatedSlot.ANY, base)) {
+					AbilityTriggerEvent triggerEvent = new AbilityTriggerEvent(k, action, base, event.getPlayer());
+					manager.callEvent(triggerEvent);
+					if (!triggerEvent.isCancelled())
+						triggerEvent.getAbility().entityRespawn(event, triggerEvent.getBaseItem());
+				}
 			});
 		abilityMap.forEach((k, v) -> {
-			if (v.contains(action) && UIFUtils.isActivatingSlot(slot, k.getActivatingSlot(), ActivatedSlot.ANY, base))
-				k.entityRespawn(event, base);
+			if (v.contains(action) && UIFUtils.isActivatingSlot(slot, k.getActivatingSlot(), ActivatedSlot.ANY, base)) {
+				AbilityTriggerEvent triggerEvent = new AbilityTriggerEvent(k, action, base, event.getPlayer());
+				manager.callEvent(triggerEvent);
+				if (!triggerEvent.isCancelled())
+					triggerEvent.getAbility().entityRespawn(event, triggerEvent.getBaseItem());
+			}
 		});
 	}
 	public void simulateAction(Action action, BlockPlaceEvent event, GenericItem base, ActivatedSlot hand) {
 		if (!base.uniqueAbilities.isEmpty())
 			base.uniqueAbilities.forEach((k, v) -> {
-				if (v.contains(action) && UIFUtils.isActivatingSlot(hand, k.getActivatingSlot(), hand, base))
-					k.placeBlock(event, base);
+				if (v.contains(action) && UIFUtils.isActivatingSlot(hand, k.getActivatingSlot(), hand, base)) {
+					AbilityTriggerEvent triggerEvent = new AbilityTriggerEvent(k, action, base, event.getPlayer());
+					manager.callEvent(triggerEvent);
+					if (!triggerEvent.isCancelled())
+						triggerEvent.getAbility().placeBlock(event, triggerEvent.getBaseItem());
+				}
 			});
 		abilityMap.forEach((k, v) -> {
-			if (v.contains(action) && UIFUtils.isActivatingSlot(hand, k.getActivatingSlot(), hand, base))
-				k.placeBlock(event, base);
+			if (v.contains(action) && UIFUtils.isActivatingSlot(hand, k.getActivatingSlot(), hand, base)) {
+				AbilityTriggerEvent triggerEvent = new AbilityTriggerEvent(k, action, base, event.getPlayer());
+				manager.callEvent(triggerEvent);
+				if (!triggerEvent.isCancelled())
+					triggerEvent.getAbility().placeBlock(event, triggerEvent.getBaseItem());
+			}
 		});
 	}
 	public void simulateAction(Action action, BlockBreakEvent event, GenericItem base, ActivatedSlot hand) {
 		if (!base.uniqueAbilities.isEmpty())
 			base.uniqueAbilities.forEach((k, v) -> {
-				if (v.contains(action) && UIFUtils.isActivatingSlot(hand, k.getActivatingSlot(), hand, base))
-					k.breakBlock(event, base);
+				if (v.contains(action) && UIFUtils.isActivatingSlot(hand, k.getActivatingSlot(), hand, base)) {
+					AbilityTriggerEvent triggerEvent = new AbilityTriggerEvent(k, action, base, event.getPlayer());
+					manager.callEvent(triggerEvent);
+					if (!triggerEvent.isCancelled())
+						triggerEvent.getAbility().breakBlock(event, triggerEvent.getBaseItem());
+				}
 			});
 		abilityMap.forEach((k, v) -> {
-			if (v.contains(action) && UIFUtils.isActivatingSlot(hand, k.getActivatingSlot(), hand, base))
-				k.breakBlock(event, base);
+			if (v.contains(action) && UIFUtils.isActivatingSlot(hand, k.getActivatingSlot(), hand, base)) {
+				AbilityTriggerEvent triggerEvent = new AbilityTriggerEvent(k, action, base, event.getPlayer());
+				manager.callEvent(triggerEvent);
+				if (!triggerEvent.isCancelled())
+					triggerEvent.getAbility().breakBlock(event, triggerEvent.getBaseItem());
+			}
 		});
 	}
 	/**
@@ -484,8 +675,8 @@ public class ItemType {
 	 * 
 	 * @return The global map of all ItemTypes
 	 */
-	public static Map<String, ItemType> getAllItems() {
-		return itemsMap;
+	public static Map<String, UIItemType> getRegistry() {
+		return registry;
 	}
 	public Class<? extends GenericItem> getInstance() {
 		return instance;
@@ -505,6 +696,28 @@ public class ItemType {
 	 */
 	public ItemStack getItem() {
 		return builder.getItem();
+	}
+	/**
+	 * Convienence method for getting an ItemStack by the custom items registered name.
+	 * 
+	 * @param item The registered name of the item to get
+	 * @return An ItemStack copy of the custom item or null if it is not registered
+	 */
+	public static ItemStack getItem(String item) {
+		UIItemType type = registry.get(item);
+		return type == null ? null : type.getItem();
+	}
+	/**
+	 * Convienence method for getting an ItemStack by the custom items registered class.
+	 * 
+	 * @param itemClass The registered class of the item to get
+	 * @return An ItemStack copy of the custom item or null if it is not registered
+	 */
+	public static ItemStack getItem(Class<? extends GenericItem> itemClass) {
+		for (Entry<String, UIItemType> entry : registry.entrySet())
+			if (entry.getValue().instance.equals(itemClass))
+				return entry.getValue().getItem();
+		return null;
 	}
 	public String getDataPath() {
 		return dataPath;
@@ -644,23 +857,11 @@ public class ItemType {
 	 * 
 	 * @return List of all registered recipes on this item type
 	 * 
-	 * @see ItemType#registerRecipe(ShapedRecipe)
-	 * @see ItemType#registerRecipe(ShapelessRecipe)
+	 * @see UIItemType#registerRecipe(ShapedRecipe)
+	 * @see UIItemType#registerRecipe(ShapelessRecipe)
 	 */
 	public List<Recipe> getRecipes() {
 		return recipes;
-	}
-	/**
-	 * Gets the anvil recipes registered with this custom item type.
-	 * <p>
-	 * <STRONG>You should add anvil recipes through the registration method. Adding anvil recipes directly to this list can break things!</STRONG>
-	 * 
-	 * @return List of all registered anvil recipes on this item type
-	 * 
-	 * @see ItemType#registerRecipe(AnvilRecipe)
-	 */
-	public List<AnvilRecipe> getAnvilRecipes() {
-		return anvilRecipes;
 	}
 	/**
 	 * Gets the recipes that have an ingredient of this custom item type.
@@ -682,7 +883,7 @@ public class ItemType {
 	 * @see ItemCategory
 	 */
 	public ItemCategory getItemCategory() {
-		return itemCategory;
+		return itemCategory != null ? itemCategory : ItemCategory.DefaultCategory.MISCELLANEOUS.getItemCategory();
 	}
 	/**
 	 * Refreshes this ItemType's builder with the default UIFramework lore format. Call this after making changes to this ItemType's meta.

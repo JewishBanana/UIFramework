@@ -20,12 +20,14 @@ import org.bukkit.inventory.meta.ItemMeta;
 import com.github.jewishbanana.uiframework.UIFramework;
 import com.github.jewishbanana.uiframework.items.GenericItem;
 import com.github.jewishbanana.uiframework.items.ItemBuilder;
-import com.github.jewishbanana.uiframework.items.ItemType;
+import com.github.jewishbanana.uiframework.items.UIItemType;
 import com.github.jewishbanana.uiframework.utils.UIFUtils;
 
 import net.md_5.bungee.api.ChatColor;
 
 public class ItemsMenu extends InventoryHandler {
+	
+	private static String categoryTranslation;
 
 	private int page;
 	private boolean adminControls;
@@ -43,7 +45,7 @@ public class ItemsMenu extends InventoryHandler {
 				this.getInventory().setItem(i, whiteGlass);
 		this.getInventory().setItem(4, ItemBuilder.create(Material.CRAFTING_TABLE).registerName(UIFUtils.convertString("&aUltimateItems "+UIFramework.getLangString("menu.recipe"))).setLoreList(Arrays.asList(UIFUtils.convertString(UIFramework.getLangString("menu.recipeInfo")))).build().getItem());
 		int start = (page - 1) * 21, end = page * 21, i = 0, c = 10;
-		for (Entry<String, ItemType> entry : ItemType.getAllItems().entrySet().stream().sorted(Comparator.comparing(entry -> entry.getValue().getItemCategory().getCategoryValue()))
+		for (Entry<String, UIItemType> entry : UIItemType.getRegistry().entrySet().stream().sorted(Comparator.comparing(entry -> entry.getValue().getItemCategory().getCategoryValue()))
 	            .collect(Collectors.toMap(Entry::getKey, Entry::getValue, (e1, e2) -> e1, LinkedHashMap::new)).entrySet()) {
 			if (entry.getKey().equals("_null"))
 				continue;
@@ -59,7 +61,10 @@ public class ItemsMenu extends InventoryHandler {
 			ItemStack temp = base.stripItemID().getItem();
 			ItemMeta tempMeta = temp.getItemMeta();
 			List<String> lore = tempMeta.getLore();
-			lore.addAll(Arrays.asList(" ", (base.getType().getRecipes().isEmpty() ? ChatColor.RED : ChatColor.GREEN)+UIFramework.getLangString("menu.creationRecipes").replace("%value%", ""+base.getType().getRecipes().size()),
+			lore.addAll(Arrays.asList(" ",
+					categoryTranslation + base.getItemCategory().getDisplayName(),
+					" ",
+					(base.getType().getRecipes().isEmpty() ? ChatColor.RED : ChatColor.GREEN)+UIFramework.getLangString("menu.creationRecipes").replace("%value%", ""+base.getType().getRecipes().size()),
 					(base.getType().getUsedRecipes().isEmpty() ? ChatColor.RED : ChatColor.BLUE)+UIFramework.getLangString("menu.usedRecipes").replace("%value%", ""+base.getType().getUsedRecipes().size())));
 			if (adminControls)
 				lore.add(UIFUtils.convertString(UIFramework.getLangString("menu.giveItem")));
@@ -93,7 +98,7 @@ public class ItemsMenu extends InventoryHandler {
 				MenuManager.registerInventory(menu.getInventory(), menu);
 				event.getWhoClicked().openInventory(menu.getInventory());
 			}));
-		if (page < Math.ceil(((double) ItemType.getAllItems().size()) / 21.0))
+		if (page < Math.ceil(((double) UIItemType.getRegistry().size()) / 21.0))
 			this.addButton(53, new InventoryButton().create(ItemBuilder.create(Material.ARROW).registerName(UIFUtils.convertString(UIFramework.getLangString("menu.page").replace("%number%", (page+1)+""))).build().getItem()).function(event -> {
 				ItemsMenu menu = new ItemsMenu(page+1, adminControls);
 				MenuManager.registerInventory(menu.getInventory(), menu);
@@ -115,5 +120,8 @@ public class ItemsMenu extends InventoryHandler {
 	@Override
 	public Inventory createInventory() {
 		return Bukkit.createInventory(null, 54, UIFUtils.convertString("&9&lUltimateItems "+UIFramework.getLangString("menu.recipe")));
+	}
+	public static void reload() {
+		categoryTranslation = UIFUtils.convertString("&f&l"+UIFramework.getLangString("menu.category"))+": ";
 	}
 }

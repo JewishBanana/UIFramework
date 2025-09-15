@@ -1,6 +1,7 @@
 package com.github.jewishbanana.uiframework.items;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -53,17 +54,19 @@ public class GenericItem {
 	protected static NamespacedKey generalKey;
 	private static NamespacedKey identityKey;
 	private static NamespacedKey defaultsKey;
+	protected static NamespacedKey persistentEnchants;
 	private static NamespacedKey hiddenEnchant;
 	static {
 		generalKey = new NamespacedKey(UIFramework.getInstance(), "ui-key");
 		identityKey = new NamespacedKey(UIFramework.getInstance(), "uii");
 		defaultsKey = new NamespacedKey(UIFramework.getInstance(), "uie-dkey");
+		persistentEnchants = new NamespacedKey(UIFramework.getInstance(), "uie-nde");
 		hiddenEnchant = new NamespacedKey(UIFramework.getInstance(), "uie-henc");
 	}
-	private ItemType type;
+	private UIItemType type;
 	protected ItemStack item;
 	private Map<NamespacedKey, ItemField<?>> fields = new HashMap<>();
-	private Set<UIEnchantment> enchants = new HashSet<>();
+	protected Set<UIEnchantment> enchants = new HashSet<>();
 	protected Map<Ability, Set<Ability.Action>> uniqueAbilities = new LinkedHashMap<>();
 	
 	private ActivatedSlot activatingSlot = ActivatedSlot.ACTIVE_SLOT;
@@ -102,7 +105,7 @@ public class GenericItem {
 					for (String s : section.getConfigurationSection("abilities").getKeys(false)) {
 						ConfigurationSection temp = section.getConfigurationSection("abilities."+s);
 						try {
-							AbilityType type = AbilityType.getAbilityType(temp.getString("ability._abilityType"));
+							UIAbilityType type = UIAbilityType.getAbilityType(temp.getString("ability._abilityType"));
 							if (type == null) {
 								if (UIFramework.debugMessages)
 									UIFramework.consoleSender.sendMessage(UIFUtils.convertString(UIFUtils.prefix+"&eERROR could not initialize unique ability '"+temp.getString("ability._abilityType")+"' on a custom item! Has the abilities host plugin been removed? No data loss has occurred, the ability will be temporarily disabled. To avoid seeing these messages you can disable debug messages in the config."));
@@ -282,7 +285,7 @@ public class GenericItem {
 	 * 
 	 * @return The created ItemBuilder
 	 * 
-	 * @see ItemBuilder#create(ItemType, ItemStack)
+	 * @see ItemBuilder#create(UIItemType, ItemStack)
 	 */
 	public ItemBuilder createItem() {
 		return ItemBuilder.create(getType(), Material.EGG);
@@ -305,17 +308,15 @@ public class GenericItem {
 	}
 	
 	/**
-	 * Gets the GenericItem base class of the given ItemStack. Will create a new GenericItem base if one does not already exist.
+	 * Gets the GenericItem base class of the given ItemStack. If the item should have a base class then this will create a new GenericItem base if one does not already exist, otherwise will return null if the item is not an applicable custom item.
 	 * 
 	 * @param item The ItemStack of the base class
 	 * @return The ItemStack's base class or null
 	 */
 	public static GenericItem getItemBase(ItemStack item) {
-		if (item == null)
+		if (item == null || !item.hasItemMeta())
 			return null;
 		ItemMeta meta = item.getItemMeta();
-		if (meta == null)
-			return null;
 		String uuid = meta.getPersistentDataContainer().get(identityKey, PersistentDataType.STRING);
 		if (uuid != null) {
 			GenericItem base = itemMap.get(uuid);
@@ -328,7 +329,7 @@ public class GenericItem {
 			String key = meta.getPersistentDataContainer().get(GenericItem.generalKey, PersistentDataType.STRING);
 			if (key == null)
 				return null;
-			ItemType type = ItemType.getItemType(key);
+			UIItemType type = UIItemType.getItemType(key);
 			if (type == null) {
 				if (UIFramework.debugMessages)
 					UIFramework.consoleSender.sendMessage(UIFUtils.convertString(UIFUtils.prefix+"&cERROR could not initialize custom item '"+key+"'. This is most likely caused by removal of the plugin that created this item before."));
@@ -359,16 +360,14 @@ public class GenericItem {
 	 * @return The newly created base class or null if N/A
 	 */
 	public static GenericItem getItemBaseNoID(ItemStack item) {
-		if (item == null)
+		if (item == null || !item.hasItemMeta())
 			return null;
 		ItemMeta meta = item.getItemMeta();
-		if (meta == null)
-			return null;
 		try {
 			String key = meta.getPersistentDataContainer().get(GenericItem.generalKey, PersistentDataType.STRING);
 			if (key == null)
 				return null;
-			ItemType type = ItemType.getItemType(key);
+			UIItemType type = UIItemType.getItemType(key);
 			if (type == null) {
 				if (UIFramework.debugMessages)
 					UIFramework.consoleSender.sendMessage(UIFUtils.convertString(UIFUtils.prefix+"&cERROR could not initialize custom item '"+key+"'. This is most likely caused by removal of the plugin that created this item before."));
@@ -402,6 +401,28 @@ public class GenericItem {
 			item.setItemMeta(meta);
 		}
 		return getItemBase(item);
+	}
+	/**
+	 * Special variation of creating the item base. This will create a new base class without attaching an ID to the item.
+	 * <p>
+	 * <STRONG>This should generally never be used aside from creating one time instances of items e.g. navigatable item menus.</STRONG>
+	 * 
+	 * @param item The item stack to create the base for
+	 * @return The created item base or null
+	 * 
+	 * @see GenericItem#createItemBase(ItemStack)
+	 */
+	public static GenericItem createItemBaseNoID(ItemStack item) {
+		if (item == null)
+			return null;
+		ItemMeta meta = item.getItemMeta();
+		if (meta == null)
+			return null;
+		if (!meta.getPersistentDataContainer().has(generalKey, PersistentDataType.STRING)) {
+			meta.getPersistentDataContainer().set(generalKey, PersistentDataType.STRING, "_null");
+			item.setItemMeta(meta);
+		}
+		return getItemBaseNoID(item);
 	}
 	/**
 	 * Remove any item base associated with the ItemStack converting it to a normal item.
@@ -515,33 +536,35 @@ public class GenericItem {
 	 * 
 	 * @param type The type of ability to remove
 	 */
-	public void removeUniqueAbilities(AbilityType type) {
+	public void removeUniqueAbilities(UIAbilityType type) {
 		Iterator<Entry<Ability, Set<Action>>> iterator = this.uniqueAbilities.entrySet().iterator();
 		while (iterator.hasNext())
 			if (iterator.next().getKey().getType().getRegisteredName().equals(type.getRegisteredName()))
 				iterator.remove();
 	}
 	/**
-	 * Retrieves a set of all custom enchants on this item.
+	 * Retrieves a map of all custom enchants on this item.
 	 * 
-	 * @return The set of the custom enchants
+	 * @return A map containing all the enchants as the keys and their levels as the values respectively
 	 */
-	public Set<UIEnchantment> getEnchants() {
-		return enchants;
+	public Map<UIEnchantment, Integer> getEnchants() {
+		return enchants.stream().collect(Collectors.toMap(e -> e, e -> e.getEnchantLevel(item)));
 	}
 	protected GenericItem applyDefaultEnchants() {
 		ItemMeta meta = item.getItemMeta();
 		PersistentDataContainer container = meta.getPersistentDataContainer();
+		Set<Integer> persistent = container.has(persistentEnchants, PersistentDataType.INTEGER_ARRAY) ?
+				Arrays.stream(container.get(persistentEnchants, PersistentDataType.INTEGER_ARRAY)).boxed().collect(Collectors.toSet()) : null;
 		if (container.has(defaultsKey, PersistentDataType.INTEGER_ARRAY))
 			for (int i : container.get(defaultsKey, PersistentDataType.INTEGER_ARRAY)) {
 				UIEnchantment enchant = UIEnchantment.getByID(i);
-				if (enchant == null)
+				if (enchant == null || (persistent != null && persistent.contains(i)))
 					continue;
 				enchant.removeEnchant(this);
 			}
 		List<Integer> defaults = new ArrayList<>();
 		type.enchants.forEach((k, v) -> {
-			if (k.addEnchant(this, v, false))
+			if (k.addEnchant(this, v, false, false))
 				defaults.add(k.getId());
 			if (k.getEnchantLevel(item) != 0)
 				enchants.add(k);
@@ -557,10 +580,10 @@ public class GenericItem {
 	 * 
 	 * @return The ItemType of the item or null
 	 */
-	public ItemType getType() {
+	public UIItemType getType() {
 		return type;
 	}
-	protected GenericItem setType(ItemType type) {
+	protected GenericItem setType(UIItemType type) {
 		this.type = type;
 		return this;
 	}
@@ -735,6 +758,18 @@ public class GenericItem {
 	/**
 	 * Gets the given custom enchant from this item if it exists otherwise returns null.
 	 * 
+	 * @param enchant The registered class of the custom enchant to get
+	 * @return The custom enchant or null
+	 */
+	public UIEnchantment getEnchant(Class<? extends UIEnchantment> enchant) {
+		for (UIEnchantment e : enchants)
+			if (e.getClass().equals(enchant))
+				return e;
+		return null;
+	}
+	/**
+	 * Gets the given custom enchant from this item if it exists otherwise returns null.
+	 * 
 	 * @param enchant The registered name of the custom enchant to get
 	 * @return The custom enchant or null
 	 */
@@ -743,6 +778,18 @@ public class GenericItem {
 			if (e.getRegisteredName().equals(enchant))
 				return e;
 		return null;
+	}
+	/**
+	 * Gets the level of the custom enchant present on this item. Convienence method for checking and getting the level.
+	 * 
+	 * @param enchant The custom enchant to check
+	 * @return The level of the custom enchant on this item or 0
+	 */
+	public int getEnchantLevel(Class<? extends UIEnchantment> enchant) {
+		for (UIEnchantment e : enchants)
+			if (e.getClass().equals(enchant))
+				return e.getEnchantLevel(item);
+		return 0;
 	}
 	/**
 	 * Gets the level of the custom enchant present on this item. Convienence method for checking and getting the level.
@@ -779,9 +826,38 @@ public class GenericItem {
 		return uuid == null ? null : UUID.fromString(uuid);
 	}
 	/**
+	 * Strips the unique ID of the item. When a new base class is created for this item it will create a new unique ID for it.
+	 */
+	public static void stripUniqueId(ItemStack item) {
+		if (item == null || !item.hasItemMeta())
+			return;
+		ItemMeta meta = item.getItemMeta();
+		meta.getPersistentDataContainer().remove(identityKey);
+		item.setItemMeta(meta);
+	}
+	/**
 	 * Refresh this base item's lore with the default UIFramework lore format (Will just call the assemble lore function for this base class).
 	 */
 	public void refreshItemLore() {
 		getType().getBuilder().assembleLore(this);
+	}
+	public void addPersistentEnchant(UIEnchantment enchant) {
+		if (enchant == null || item == null || !item.hasItemMeta())
+			return;
+		ItemMeta meta = item.getItemMeta();
+		if (!meta.getPersistentDataContainer().has(persistentEnchants, PersistentDataType.INTEGER_ARRAY)) {
+			meta.getPersistentDataContainer().set(persistentEnchants, PersistentDataType.INTEGER_ARRAY, new int[] { enchant.getId() });
+			item.setItemMeta(meta);
+			return;
+		}
+		List<Integer> stored = Arrays.stream(meta.getPersistentDataContainer().get(persistentEnchants, PersistentDataType.INTEGER_ARRAY)).boxed().collect(Collectors.toList());
+		if (stored.contains(enchant.getId()))
+			return;
+		int[] replace = new int[stored.size()+1];
+		for (int i=0; i < stored.size(); i++)
+			replace[i] = stored.get(i);
+		replace[stored.size()] = enchant.getId();
+		meta.getPersistentDataContainer().set(persistentEnchants, PersistentDataType.INTEGER_ARRAY, replace);
+		item.setItemMeta(meta);
 	}
 }

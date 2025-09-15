@@ -9,7 +9,6 @@ import org.bukkit.Keyed;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.configuration.ConfigurationSection;
-import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.Recipe;
@@ -18,6 +17,8 @@ import org.bukkit.inventory.ShapedRecipe;
 import org.bukkit.inventory.ShapelessRecipe;
 
 import com.github.jewishbanana.uiframework.UIFramework;
+import com.github.jewishbanana.uiframework.utils.AnvilRecipe.AnvilChoice;
+import com.github.jewishbanana.uiframework.utils.AnvilRecipe.AnvilChoice.SlotOrder;
 
 public class UIFDataUtils {
 	
@@ -91,34 +92,57 @@ public class UIFDataUtils {
 			return false;
 		return arg1.equals(arg2);
 	}
-	public static <T extends Recipe & Keyed> void writeRecipeToSection(YamlConfiguration file, T recipe, String section) {
+	public static <T extends Recipe & Keyed> void writeRecipeToSection(ConfigurationSection section, T recipe) {
 		String recipeType = null;
 		if (recipe instanceof ShapedRecipe)
 			recipeType = "shaped";
 		else if (recipe instanceof ShapelessRecipe)
 			recipeType = "shapeless";
+		else if (recipe instanceof AnvilRecipe)
+			recipeType = "anvil";
 		if (recipeType == null)
 			throw new IllegalArgumentException("[UIFramework]: Cannot write recipe to file because the recipe type "+recipe.getClass().getName()+" is not supported!");
-		file.set(section+".type", recipeType);
+		section.set("type", recipeType);
 		switch (recipeType) {
 		case "shaped":
 			ShapedRecipe shaped = (ShapedRecipe) recipe;
-			file.set(section+".shape", Arrays.asList(shaped.getShape()));
-			file.createSection(section+".exact");
-			file.createSection(section+".material");
+			section.set("shape", Arrays.asList(shaped.getShape()));
+			section.createSection("exact");
+			section.createSection("material");
 			shaped.getChoiceMap().forEach((k, v) -> {
 				if (v != null) {
 					if (v instanceof RecipeChoice.ExactChoice)
-						file.set(section+".exact."+k, ((RecipeChoice.ExactChoice) v).getChoices());
+						section.set("exact."+k, ((RecipeChoice.ExactChoice) v).getChoices());
 					else
-						file.set(section+".material."+k, ((RecipeChoice.MaterialChoice) v).getChoices().stream().map(e -> e.toString()).collect(Collectors.toList()));
+						section.set("material."+k, ((RecipeChoice.MaterialChoice) v).getChoices().stream().map(e -> e.toString()).collect(Collectors.toList()));
 				}
 			});
 			break;
 		case "shapeless":
 			ShapelessRecipe shapeless = (ShapelessRecipe) recipe;
-			file.set(section+".exact", shapeless.getChoiceList().stream().filter(k -> k instanceof RecipeChoice.ExactChoice).map(k -> ((RecipeChoice.ExactChoice) k).getChoices()).collect(Collectors.toList()));
-			file.set(section+".material", shapeless.getChoiceList().stream().filter(k -> k instanceof RecipeChoice.MaterialChoice).map(k -> ((RecipeChoice.MaterialChoice) k).getChoices().stream().map(l -> l.toString()).collect(Collectors.toList())).collect(Collectors.toList()));
+			section.set("exact", shapeless.getChoiceList().stream().filter(k -> k instanceof RecipeChoice.ExactChoice).map(k -> ((RecipeChoice.ExactChoice) k).getChoices()).collect(Collectors.toList()));
+			section.set("material", shapeless.getChoiceList().stream().filter(k -> k instanceof RecipeChoice.MaterialChoice).map(k -> ((RecipeChoice.MaterialChoice) k).getChoices().stream().map(l -> l.toString()).collect(Collectors.toList())).collect(Collectors.toList()));
+			break;
+		case "anvil":
+			AnvilRecipe anvil = (AnvilRecipe) recipe;
+			section.set("isRepair", anvil.isRepair());
+			section.set("levelCost", anvil.getLevelCost());
+			section.set("repairAmount", anvil.getRepairAmount());
+			if (anvil.getAnvilChoice().getFirstSlot() instanceof RecipeChoice.ExactChoice) {
+				section.set("firstType", "exact");
+				section.set("first", ((RecipeChoice.ExactChoice) anvil.getAnvilChoice().getFirstSlot()).getChoices());
+			} else {
+				section.set("firstType", "material");
+				section.set("first", ((RecipeChoice.MaterialChoice) anvil.getAnvilChoice().getFirstSlot()).getChoices().stream().map(e -> e.toString()).collect(Collectors.toList()));
+			}
+			if (anvil.getAnvilChoice().getSecondSlot() instanceof RecipeChoice.ExactChoice) {
+				section.set("secondType", "exact");
+				section.set("second", ((RecipeChoice.ExactChoice) anvil.getAnvilChoice().getSecondSlot()).getChoices());
+			} else {
+				section.set("secondType", "material");
+				section.set("second", ((RecipeChoice.MaterialChoice) anvil.getAnvilChoice().getSecondSlot()).getChoices().stream().map(e -> e.toString()).collect(Collectors.toList()));
+			}
+			section.set("slotOrder", anvil.getAnvilChoice().getSlotOrder().toString());
 			break;
 		}
 	}
@@ -145,6 +169,21 @@ public class UIFDataUtils {
 				for (List<String> list : ((List<List<String>>) section.get("material")))
 					shapelessRecipe.addIngredient(new RecipeChoice.MaterialChoice(list.stream().map(k -> Material.getMaterial(k)).collect(Collectors.toList())));
 				return (T) shapelessRecipe;
+			case "anvil":
+				RecipeChoice firstSlot = null;
+				if (section.getString("firstType").equals("exact"))
+					firstSlot = new RecipeChoice.ExactChoice((List<ItemStack>) section.get("first"));
+				else
+					firstSlot = new RecipeChoice.MaterialChoice(section.getStringList("first").stream().map(e -> Material.valueOf(e)).collect(Collectors.toList()));
+				RecipeChoice secondSlot = null;
+				if (section.getString("secondType").equals("exact"))
+					firstSlot = new RecipeChoice.ExactChoice((List<ItemStack>) section.get("second"));
+				else
+					firstSlot = new RecipeChoice.MaterialChoice(section.getStringList("second").stream().map(e -> Material.valueOf(e)).collect(Collectors.toList()));
+				if (!section.getBoolean("isRepair"))
+					return (T) new AnvilRecipe(key, new AnvilChoice(firstSlot, secondSlot, SlotOrder.valueOf(section.getString("slotOrder"))), result, section.getInt("levelCost"));
+				else
+					return (T) new AnvilRecipe(key, firstSlot, secondSlot, section.getInt("repairAmount"), section.getInt("levelCost"));
 			}
 		} catch (Exception e) {
 			e.printStackTrace();

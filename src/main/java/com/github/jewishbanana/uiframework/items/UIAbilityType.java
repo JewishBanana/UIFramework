@@ -7,36 +7,52 @@ import java.util.Map.Entry;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-import com.github.jewishbanana.uiframework.UIFramework;
+import org.bukkit.inventory.ItemType;
 
-public class AbilityType {
+import com.github.jewishbanana.uiframework.UIFramework;
+import com.github.jewishbanana.uiframework.utils.UIFUtils;
+
+public class UIAbilityType {
 	
-	private static Map<String, AbilityType> typeMap = new HashMap<>();
+	private static final Map<String, UIAbilityType> registry = new HashMap<>();
 	
 	private Map<UUID, Integer> cooldown = new ConcurrentHashMap<>();
 	private Class<? extends Ability> instance;
 	private String displayName, registeredName;
 	private String description;
 	
-	private AbilityType(Class<? extends Ability> instance) {
+	private UIAbilityType(String registeredName, Class<? extends Ability> instance) {
+		this.registeredName = registeredName;
 		this.instance = instance;
+		this.displayName = '['+registeredName+']';
+	}
+	private static UIAbilityType createAbilityType(String registeredName, Class<? extends Ability> instance) {
+		UIAbilityType type = new UIAbilityType(registeredName, instance);
+		try {
+			instance.getDeclaredConstructor(UIAbilityType.class).newInstance(type);
+			return type;
+		} catch (Exception e) {
+			e.printStackTrace();
+			UIFramework.consoleSender.sendMessage(UIFUtils.convertString("&e[UIFramework]: An error has occurred above this message while trying to register ability &d"+registeredName+" &e! This is NOT a UIFramework bug! Report this to the proper plugin author(s) of the related ability."));
+			return null;
+		}
 	}
 	/**
 	 * Register a new custom ability to UIFramework. <STRONG>This must be done every time your plugin starts!</STRONG>
 	 * <p>
-	 * <i>It is good practice to make your registered name start with a prefix of your plugins name to avoid any potential conflicts with other plugins (e.g. uif-explosions)</i>
+	 * <i>It is good practice to make your registered name start with a prefix of your plugins name to avoid any potential conflicts with other plugins (e.g. uif-explosion)</i>
 	 * 
-	 * @param name The unique registered name of your ability
+	 * @param registeredName The unique registered name of your ability
 	 * @param instance The associated class of your custom ability
 	 * @return The AbilityType instance created
 	 */
-	public static AbilityType registerAbility(String name, Class<? extends Ability> instance) {
-		if (typeMap.containsKey(name))
-			throw new IllegalArgumentException("[UIFramework]: Cannot register ability '"+name+"' as an ability with that name is already registered!");
-		AbilityType type = new AbilityType(instance);
-		type.registeredName = name;
-		type.displayName = '['+name+']';
-		typeMap.put(name, type);
+	public static UIAbilityType registerAbility(String registeredName, Class<? extends Ability> instance) {
+		if (registry.containsKey(registeredName))
+			throw new IllegalArgumentException("[UIFramework]: Cannot register ability '"+registeredName+"' as an ability with that name is already registered!");
+		UIAbilityType type = createAbilityType(registeredName, instance);
+		if (type == null)
+			return null;
+		registry.put(registeredName, type);
 		return type;
 	}
 	/**
@@ -45,8 +61,36 @@ public class AbilityType {
 	 * @param name The name of the ability
 	 * @return The AbilityType instance or null
 	 */
-	public static AbilityType getAbilityType(String name) {
-		return typeMap.get(name);
+	public static UIAbilityType getAbilityType(String name) {
+		return registry.get(name);
+	}
+	/**
+	 * Gets the ability type instance by its registered class.
+	 * 
+	 * @param abilityClass The class of the ability type to get
+	 * @return The ability type or null if it is not registered
+	 */
+	public static UIAbilityType getAbilityType(Class<? extends Ability> abilityClass) {
+		for (Entry<String, UIAbilityType> entry : registry.entrySet())
+			if (entry.getValue().instance.equals(abilityClass))
+				return entry.getValue();
+		return null;
+	}
+	/**
+	 * Creates a new instance of the given ability.
+	 * 
+	 * @param abilityClass The class of the ability to create
+	 * @return The new instance created
+	 */
+	public static <T extends Ability> T createAbilityInstance(Class<T> abilityClass) {
+		for (Entry<String, UIAbilityType> entry : registry.entrySet())
+			if (entry.getValue().instance.equals(abilityClass))
+				try {
+					return abilityClass.getDeclaredConstructor(UIAbilityType.class).newInstance(entry.getValue());
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+		return null;
 	}
 	/**
 	 * <Strong>Internal use only!</STRONG>
@@ -54,7 +98,7 @@ public class AbilityType {
 	 */
 	public static void init(UIFramework plugin) {
 		plugin.getServer().getScheduler().runTaskTimerAsynchronously(plugin, () -> {
-			for (AbilityType type : typeMap.values()) {
+			for (UIAbilityType type : registry.values()) {
 				Iterator<Entry<UUID, Integer>> it = type.cooldown.entrySet().iterator();
 				while (it.hasNext()) {
 					Entry<UUID, Integer> entry = it.next();
@@ -71,7 +115,7 @@ public class AbilityType {
 	 */
 	public Ability createNewInstance() {
 		try {
-			return instance.getDeclaredConstructor().newInstance().setType(this);
+			return instance.getDeclaredConstructor(UIAbilityType.class).newInstance(this);
 		} catch (Exception e) {
 			e.printStackTrace();
 			return null;
@@ -87,7 +131,7 @@ public class AbilityType {
 		return cooldown.containsKey(uuid);
 	}
 	public int getEntityCooldown(UUID uuid) {
-		return cooldown.containsKey(uuid) ? cooldown.get(uuid) : 0;
+		return cooldown.getOrDefault(uuid, 0);
 	}
 	/**
 	 * Puts the given entity on cooldown for this ability type.

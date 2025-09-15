@@ -7,7 +7,7 @@ api-version: 1.17
 
 commands:
     uiframework:
-        usage: /uiframework <help|reload|give|recipes|enchant>...
+        usage: /uiframework <give|enchant|summon|recipes|entities|help|reload|>...
         description: Universal command for the plugin. Use /uiframework help, for more information.
         aliases: [ui, uitems]
         
@@ -33,3 +33,7 @@ permissions:
         description: Allows you to delete and add recipes for items.
     uiframework.enchant:
         description: Allows you to use the enchant command to apply custom enchants to items.
+    uiframework.summon:
+        description: Allows you to use the summon command to summon custom entities.
+    uiframework.entities:
+        description: Allows you to use the entities command to display admin information and manipulate custom entities.

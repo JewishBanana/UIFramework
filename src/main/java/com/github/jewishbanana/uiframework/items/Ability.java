@@ -30,7 +30,7 @@ import com.github.jewishbanana.uiframework.utils.UIFUtils;
 
 public class Ability {
 	
-	private AbilityType type;
+	private UIAbilityType type;
 	private int cooldownTicks;
 	private ActivatedSlot activatingSlot = ActivatedSlot.PARENT;
 	private String displayName;
@@ -43,6 +43,9 @@ public class Ability {
 	private static boolean cooldownMessages;
 	private static boolean chatMessages;
 	
+	public Ability(UIAbilityType type) {
+		this.type = type;
+	}
 	/**
 	 * Will attempt to determine if the given entity is on cooldown for this ability. If the entity is not on cooldown then this will immediatly set them to the full length cooldown of this ability. 
 	 * Will send players on cooldown an indicating message of the cooldown which can be configured by the user in UIFramework's config.
@@ -234,7 +237,7 @@ public class Ability {
 		return map;
 	}
 	public void deserialize(Map<String, Object> map) {
-		type = AbilityType.getAbilityType((String) map.get("_abilityType"));
+		type = UIAbilityType.getAbilityType((String) map.get("_abilityType"));
 		cooldownTicks = (int) map.get("_cooldownTicks");
 		activatingSlot = ActivatedSlot.valueOf((String) map.get("_activatingSlot"));
 	}
@@ -245,12 +248,8 @@ public class Ability {
 		chatMessages = !(UIFDataUtils.getConfigString("general.cooldown_message_appearance").equalsIgnoreCase("hotbar") && UIFUtils.usingSpigot);
 	}
 	
-	public AbilityType getType() {
+	public UIAbilityType getType() {
 		return type;
-	}
-	public Ability setType(AbilityType type) {
-		this.type = type;
-		return this;
 	}
 	public String getDisplayName() {
 		return displayName == null ? type.getDisplayName() : displayName;
@@ -277,6 +276,7 @@ public class Ability {
 		this.activatingSlot = activatingSlot;
 	}
 	public enum Action {
+		INTERACTION("action."),
 		LEFT_CLICK("action.left_click"),
 		LEFT_CLICK_BLOCK("action.left_click_block"),
 		SHIFT_LEFT_CLICK("action.shift_left_click"),

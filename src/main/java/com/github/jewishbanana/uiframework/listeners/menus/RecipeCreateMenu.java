@@ -17,12 +17,11 @@ import org.bukkit.inventory.Recipe;
 import org.bukkit.inventory.RecipeChoice;
 import org.bukkit.inventory.ShapedRecipe;
 import org.bukkit.inventory.ShapelessRecipe;
-import org.bukkit.inventory.meta.ItemMeta;
 
 import com.github.jewishbanana.uiframework.UIFramework;
 import com.github.jewishbanana.uiframework.items.GenericItem;
 import com.github.jewishbanana.uiframework.items.ItemBuilder;
-import com.github.jewishbanana.uiframework.items.ItemType;
+import com.github.jewishbanana.uiframework.items.UIItemType;
 import com.github.jewishbanana.uiframework.utils.UIFUtils;
 
 public class RecipeCreateMenu extends InventoryHandler {
@@ -31,14 +30,14 @@ public class RecipeCreateMenu extends InventoryHandler {
 	static {
 		plugin = UIFramework.getInstance();
 	}
-	private ItemType type;
+	private UIItemType type;
 	private String itemDisplayName;
 	private String recipeType;
 	public RecipeMenu returnMenu;
 	private RecipeCreateMenu returnRecipeMenu;
 	private Recipe recipe;
 	
-	public RecipeCreateMenu(ItemType type, String itemDisplayName, String recipeType, RecipeMenu returnMenu) {
+	public RecipeCreateMenu(UIItemType type, String itemDisplayName, String recipeType, RecipeMenu returnMenu) {
 		this.type = type;
 		this.itemDisplayName = itemDisplayName;
 		this.recipeType = recipeType;
@@ -46,7 +45,7 @@ public class RecipeCreateMenu extends InventoryHandler {
 		this.returnMenu = returnMenu;
 		this.decorate();
 	}
-	public RecipeCreateMenu(ItemType type, String itemDisplayName, String recipeType, RecipeCreateMenu returnRecipeMenu) {
+	public RecipeCreateMenu(UIItemType type, String itemDisplayName, String recipeType, RecipeCreateMenu returnRecipeMenu) {
 		this.type = type;
 		this.itemDisplayName = itemDisplayName;
 		this.recipeType = recipeType;
@@ -106,7 +105,7 @@ public class RecipeCreateMenu extends InventoryHandler {
 				}
 				break;
 			}
-			this.addButton(45, new InventoryButton().create(ItemBuilder.create(Material.ARROW).registerName(UIFUtils.convertString(UIFramework.getLangString("menu.returnRecipe"))).build().getItem()).function(event -> {
+			this.addButton(45, new InventoryButton().create(ItemBuilder.create(Material.PAPER).registerName(UIFUtils.convertString(UIFramework.getLangString("menu.returnRecipe"))).build().getItem()).function(event -> {
 				MenuManager.registerInventory(returnRecipeMenu.getInventory(), returnRecipeMenu);
 				event.getWhoClicked().openInventory(returnRecipeMenu.getInventory());
 			}));
@@ -165,13 +164,7 @@ public class RecipeCreateMenu extends InventoryHandler {
 		GenericItem base = GenericItem.getItemBaseNoID(item.clone());
 		if (base == null)
 			return item;
-		ItemStack tempItem = base.getItem();
-		ItemMeta tempMeta = tempItem.getItemMeta();
-		base.stripTags(tempMeta);
-		base.getFields().clear();
-		base.getEnchants().clear();
-		base.getType().getBuilder().assembleLore(tempItem, tempMeta, base.getType(), base);
-		return tempItem;
+		return UIFUtils.stripItemTags(base);
 	}
 	public void onClick(InventoryClickEvent event) {
 		int slot = event.getRawSlot();

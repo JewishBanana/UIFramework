@@ -4,6 +4,7 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 
 import org.bukkit.Material;
@@ -36,15 +37,15 @@ import com.github.jewishbanana.uiframework.utils.UIFUtils;
 
 public class UIEnchantment {
 	
-	protected static NamespacedKey enchantKey;
-	private static Enchantment fakeEnchant;
+	protected static final NamespacedKey enchantKey;
+	private static final Enchantment fakeEnchant;
 	static {
 		enchantKey = new NamespacedKey(UIFramework.getInstance(), "uie-key");
 		fakeEnchant = Registry.ENCHANTMENT.get(NamespacedKey.minecraft("power"));
 	}
-	private static Map<String, UIEnchantment> enchantsMap = new LinkedHashMap<>();
-	private static Set<Integer> registeredIdList = new HashSet<>();
-	private static Set<Integer> preIdList = new HashSet<>();
+	private static final Map<String, UIEnchantment> registry = new LinkedHashMap<>();
+	private static final Set<Integer> registeredIdList = new HashSet<>();
+	private static final Set<Integer> preIdList = new HashSet<>();
 	
 	private int id;
 	private int maxLevel = 1;
@@ -56,13 +57,13 @@ public class UIEnchantment {
 	
 	private ActivatedSlot activatingSlot = ActivatedSlot.PARENT;
 	
-	public UIEnchantment(String registeredName, int id) {
+	protected void embedValues(String registeredName, int id) {
 		this.registeredName = registeredName;
 		this.id = id;
 		try {
 			this.registeredKey = new NamespacedKey(UIFramework.getInstance(), registeredName.replaceFirst(":", "-"));
 		} catch (IllegalArgumentException e) {
-			UIFramework.consoleSender.sendMessage(UIFUtils.convertString(UIFUtils.prefix+"&cERROR while registering enchant &e'"+registeredName+"' &cThe following error is not a UIFramework bug! Contact the proper author of this enchant with the error below. The enchant cannot be registered with more than one ':' if this symbol is present multiple times in the name."));
+			UIFramework.consoleSender.sendMessage(UIFUtils.convertString(UIFUtils.prefix+"&cERROR while registering enchant &e'"+registeredName+"' &cThe following error is not a UIFramework bug! Contact the proper author of this enchant with the error below. The enchant cannot be registered with more than one ':' character if this symbol is present multiple times in the name."));
 			throw e;
 		}
 	}
@@ -76,7 +77,7 @@ public class UIEnchantment {
 	 * @return The UIEnchantment instance created
 	 */
 	public static UIEnchantment registerEnchant(String name, Class<? extends UIEnchantment> instance) {
-		if (enchantsMap.containsKey(name))
+		if (registry.containsKey(name))
 			throw new IllegalArgumentException("[UIFramework]: Cannot register enchant '"+name+"' as an enchant with that name is already registered!");
 		if (UIFramework.dataFile.contains("enchant."+name)) {
 			int id = UIFDataUtils.getDataFileInt("enchant."+name+".id");
@@ -85,11 +86,12 @@ public class UIEnchantment {
 				for (int i=0; i < 999999; i++)
 					if (!registeredIdList.contains(i)) {
 						try {
-							type = instance.getDeclaredConstructor(String.class, int.class).newInstance(name, id);
+							type = instance.getDeclaredConstructor().newInstance();
+							type.embedValues(name, id);
 						} catch (Exception e) {
 							e.printStackTrace();
 						}
-						enchantsMap.put(name, type);
+						registry.put(name, type);
 						registeredIdList.add(i);
 						UIFramework.dataFile.set("enchant."+name+".id", i);
 						id = i;
@@ -99,11 +101,12 @@ public class UIEnchantment {
 				return type;
 			}
 			try {
-				type = instance.getDeclaredConstructor(String.class, int.class).newInstance(name, id);
+				type = instance.getDeclaredConstructor().newInstance();
+				type.embedValues(name, id);
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
-			enchantsMap.put(name, type);
+			registry.put(name, type);
 			registeredIdList.add(id);
 			return type;
 		}
@@ -111,11 +114,12 @@ public class UIEnchantment {
 			if (!registeredIdList.contains(i) && !preIdList.contains(i)) {
 				UIEnchantment type = null;
 				try {
-					type = instance.getDeclaredConstructor(String.class, int.class).newInstance(name, i);
+					type = instance.getDeclaredConstructor().newInstance();
+					type.embedValues(name, i);
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
-				enchantsMap.put(name, type);
+				registry.put(name, type);
 				registeredIdList.add(i);
 				UIFramework.dataFile.createSection("enchant."+name);
 				UIFramework.dataFile.set("enchant."+name+".id", i);
@@ -132,7 +136,7 @@ public class UIEnchantment {
 	 * <STRONG>This method is handled automatically by UIFramework for server restarts/reloads</STRONG>
 	 */
 	public static void cleanEnchants() {
-		enchantsMap.values().forEach(i -> i.clean());
+		registry.values().forEach(i -> i.clean());
 	}
 	/**
 	 * Get a UIEnchantment by its registered name.
@@ -141,7 +145,19 @@ public class UIEnchantment {
 	 * @return The UIEnchantment instance or null
 	 */
 	public static UIEnchantment getEnchant(String name) {
-		return enchantsMap.get(name);
+		return registry.get(name);
+	}
+	/**
+	 * Get a UIEnchantment by its registered class.
+	 * 
+	 * @param enchantClass The registered class of the custom enchant
+	 * @return The UIEnchantment instance or null
+	 */
+	public static UIEnchantment getEnchant(Class<? extends UIEnchantment> enchantClass) {
+		for (Entry<String, UIEnchantment> entry : registry.entrySet())
+			if (entry.getValue().getClass().equals(enchantClass))
+				return entry.getValue();
+		return null;
 	}
 	/**
 	 * Get a UIEnchantment by its registerd unique id
@@ -150,7 +166,7 @@ public class UIEnchantment {
 	 * @return The UIEnchantment instance or null
 	 */
 	public static UIEnchantment getByID(int id) {
-		for (UIEnchantment item : enchantsMap.values())
+		for (UIEnchantment item : registry.values())
 			if (item.id == id)
 				return item;
 		return null;
@@ -158,14 +174,14 @@ public class UIEnchantment {
 	/**
 	 * Adds this custom enchant to the specified item.
 	 * 
-	 * @param item The item to apply the enchant to
+	 * @param base The base class of the item
 	 * @param level The level of the enchant to apply
 	 * @param overwrite If this enchant already exists on the item should it overwrite the level or ignore
 	 * @return If the enchant was applied or not
 	 */
-	public boolean addEnchant(GenericItem base, int level, boolean overwrite) {
+	public boolean addEnchant(GenericItem base, int level, boolean overwrite, boolean persist) {
 		ItemStack item = base.getItem();
-		if (item == null || item.getItemMeta() == null)
+		if (item == null || !item.hasItemMeta())
 			return false;
 		ItemMeta meta = item.getItemMeta();
 		PersistentDataContainer container = meta.getPersistentDataContainer();
@@ -186,7 +202,7 @@ public class UIEnchantment {
 				int[] replace = new int[array.length+1];
 				for (int i=0; i < array.length; i++)
 					replace[i] = array[i];
-				replace[array.length+1] = id;
+				replace[array.length] = id;
 				container.set(enchantKey, PersistentDataType.INTEGER_ARRAY, replace);
 			}
 			if (item.getType() != Material.ENCHANTED_BOOK && meta.getEnchants().size() == 0 && getFakeEnchant() != null) {
@@ -195,8 +211,10 @@ public class UIEnchantment {
 			}
 			item.setItemMeta(meta);
 			base.item = item;
-			base.getEnchants().add(this);
+			base.enchants.add(this);
 			loadEnchant(base);
+			if (persist)
+				base.addPersistentEnchant(this);
 			return true;
 		}
 		container.set(registeredKey, PersistentDataType.INTEGER, level);
@@ -207,15 +225,37 @@ public class UIEnchantment {
 		}
 		item.setItemMeta(meta);
 		base.item = item;
-		base.getEnchants().add(this);
+		base.enchants.add(this);
 		loadEnchant(base);
+		if (persist)
+			base.addPersistentEnchant(this);
 		return true;
+	}
+	/**
+	 * Adds this custom enchant to the specified item.
+	 * 
+	 * @param item The item to add the enchant to
+	 * @param level The level of the enchant to add
+	 * @param overwrite If this enchant already exists on the item should it overwrite the level or ignore
+	 * @return If the enchant was applied or not
+	 */
+	public boolean addEnchant(ItemStack item, int level, boolean overwrite) {
+		return addEnchant(GenericItem.createItemBase(item), level, overwrite, false);
+	}
+	/**
+	 * Adds this custom enchant to the specified item.
+	 * 
+	 * @param item The item to add the enchant to
+	 * @param level The level of the enchant to add
+	 * @return If the enchant was applied or not
+	 */
+	public boolean addEnchant(ItemStack item, int level) {
+		return addEnchant(GenericItem.createItemBase(item), level, true, false);
 	}
 	/**
 	 * Removes the specified custom enchant from the given item
 	 * 
-	 * @param enchant The custom enchant to remove
-	 * @param item The item to remove the enchant from
+	 * @param base The base class of the item to remove from
 	 * @return If the enchant was removed from the item or not
 	 */
 	public boolean removeEnchant(GenericItem base) {
@@ -245,8 +285,18 @@ public class UIEnchantment {
 		container.set(enchantKey, PersistentDataType.INTEGER_ARRAY, replace);
 		container.remove(registeredKey);
 		item.setItemMeta(meta);
-		base.getEnchants().remove(this);
+		base.enchants.remove(this);
 		return true;
+	}
+	/**
+	 * Removes the specified custom enchant from the given item
+	 * 
+	 * @param item The item to remove the enchant from
+	 * @return If the enchant was removed from the item or not
+	 */
+	public boolean removeEnchant(ItemStack item) {
+		GenericItem base = GenericItem.getItemBase(item);
+		return base != null ? removeEnchant(base) : false;
 	}
 	/**
 	 * Checks if the given ItemStack has this custom enchant or not.
@@ -280,7 +330,7 @@ public class UIEnchantment {
 	 * @return If the item does not violate any of this enchantments rules
 	 */
 	public boolean canBeEnchanted(ItemStack item) {
-		if (item.getItemMeta() == null)
+		if (item == null)
 			return false;
 		if (!applicableTypes.isEmpty() && !applicableTypes.contains(item.getType()))
 			return false;
@@ -288,7 +338,7 @@ public class UIEnchantment {
 			return false;
 		if (!conflictCustom.isEmpty() && conflictCustom.stream().anyMatch(e -> {
 			UIEnchantment ue = getEnchant(e);
-			return ue != null && item.getItemMeta().getPersistentDataContainer().has(ue.registeredKey, PersistentDataType.INTEGER);
+			return ue != null && ue.hasEnchant(item);
 		}))
 			return false;
 		return true;
@@ -526,8 +576,8 @@ public class UIEnchantment {
 	 * 
 	 * @return A map of all custom enchants on the server with the key as their registered names
 	 */
-	public static Map<String, UIEnchantment> getEnchantsMap() {
-		return enchantsMap;
+	public static Map<String, UIEnchantment> getRegistry() {
+		return registry;
 	}
 	/**
 	 * Get the activating slot that items with this enchant must be in for the enchants events to run
@@ -588,5 +638,17 @@ public class UIEnchantment {
 	 */
 	public NamespacedKey getEnchantKey() {
 		return registeredKey;
+	}
+	/**
+	 * Get the cost of applying this enchant to an item within an anvil. This should be overriden in your custom enchants class if you wish to modify the value. The value returned will be the total cost for applying this enchant. 
+	 * The default is the level multiplied by 2. Keep in mind that vanilla behavior is to double the cost if the enchant is not applied as an enchanted book, so the default method will also mimic this.
+	 * 
+	 * @param item The item to apply the enchant to which is in the left slot of the anvil
+	 * @param material The item that is in the right slot of the anvil which will be consumed
+	 * @param level The level of the enchant to apply
+	 * @return The total cost to apply this enchant to the item
+	 */
+	public int getAnvilCost(ItemStack item, ItemStack material, int level) {
+		return level * 2 * (material.getType() == Material.ENCHANTED_BOOK ? 1 : 2);
 	}
 }

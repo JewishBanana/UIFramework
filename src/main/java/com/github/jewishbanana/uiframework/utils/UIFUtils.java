@@ -25,6 +25,7 @@ import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.EntityCategory;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -183,26 +184,40 @@ public class UIFUtils {
 			return true;
 		}
 	}
+	public static ItemStack stripItemTags(GenericItem base) {
+		ItemStack baseItem = base.getItem();
+		ItemMeta tempMeta = baseItem.getItemMeta();
+		tempMeta.setDisplayName(null);
+		tempMeta.setLore(null);
+		tempMeta.setAttributeModifiers(null);
+		tempMeta.removeItemFlags(ItemFlag.HIDE_ENCHANTS, ItemFlag.HIDE_ATTRIBUTES);
+		base.stripTags(tempMeta);
+		baseItem.setItemMeta(tempMeta);
+		return baseItem;
+	}
 	public static boolean isItemSimilar(ItemStack sample, ItemStack expected, boolean ignoreName) {
 		if (sample == null || expected == null || sample.getType() != expected.getType() || sample.hasItemMeta() != expected.hasItemMeta())
         	return false;
-        GenericItem base = GenericItem.getItemBaseNoID(sample);
-        ItemStack item = sample.clone();
+		ItemStack expectedClone = expected.clone();
+		GenericItem expectedBase = GenericItem.getItemBaseNoID(expected);
+		if (expectedBase != null)
+			expectedClone = stripItemTags(expectedBase);
+		ItemStack item = sample.clone();
+        GenericItem base = GenericItem.getItemBaseNoID(item);
+        if (base != null)
+        	item = stripItemTags(base);
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
+        	ItemMeta expectedMeta = expectedClone.getItemMeta();
         	if (ignoreName)
-            	meta.setDisplayName(expected.getItemMeta().getDisplayName());
-        	else if (!meta.getDisplayName().equals(expected.getItemMeta().getDisplayName()))
+            	meta.setDisplayName(expectedMeta.getDisplayName());
+        	else if (!meta.getDisplayName().equals(expectedMeta.getDisplayName()))
         		return false;
         	if (meta instanceof Damageable)
-        		((Damageable) meta).setDamage(0);
+        		((Damageable) meta).setDamage(((Damageable) expectedMeta).getDamage());
+        	return Bukkit.getItemFactory().equals(meta, expectedMeta);
         }
-        if (base != null) {
-        	base.getType().getBuilder().assembleLore(item, meta, base.getType(), null);
-        	base.stripTags(meta);
-    		return Bukkit.getItemFactory().equals(meta, expected.getItemMeta());
-        }
-        return (sample.hasItemMeta() ? Bukkit.getItemFactory().equals(meta, expected.getItemMeta()) : true);
+        return (sample.hasItemMeta() ? Bukkit.getItemFactory().equals(meta, expectedClone.getItemMeta()) : true);
 	}
 	public static Random getRandom() {
 		return random;

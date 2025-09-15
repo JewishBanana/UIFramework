@@ -16,9 +16,5 @@ general:
     # This setting will automatically refresh custom item abilities and lore when an inventory is opened. This may cause lag if there are too many custom items on the server, turn off if you experience lag with this
     refresh_on_open: true
 messages:
-    # Message displayed to non player entities who run player only commands
-    console_error_message: "&cUnable to execute command from console!"
-    # Message displayed to those who try to run a command but do not have permission to
-    permission_error: "&cYou do not have permission to use that!"
     # Message displayed to players who try to activate abilities that are on cooldown
     abilityCooldown: "&cYou cannot use %ability% &cfor another &e%cooldown% &cseconds!"

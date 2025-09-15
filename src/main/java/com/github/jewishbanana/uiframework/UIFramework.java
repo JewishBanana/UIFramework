@@ -13,15 +13,20 @@ import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import com.github.jewishbanana.uiframework.commands.UICommand;
+import com.github.jewishbanana.uiframework.entities.UIEntityManager;
 import com.github.jewishbanana.uiframework.items.Ability;
-import com.github.jewishbanana.uiframework.items.AbilityType;
 import com.github.jewishbanana.uiframework.items.GenericItem;
-import com.github.jewishbanana.uiframework.items.ItemType;
 import com.github.jewishbanana.uiframework.items.RecipeBook;
+import com.github.jewishbanana.uiframework.items.UIAbilityType;
 import com.github.jewishbanana.uiframework.items.UIEnchantment;
+import com.github.jewishbanana.uiframework.items.UIItemType;
 import com.github.jewishbanana.uiframework.listeners.AbilityListener;
+import com.github.jewishbanana.uiframework.listeners.EntitiesListener;
 import com.github.jewishbanana.uiframework.listeners.ItemListener;
+import com.github.jewishbanana.uiframework.listeners.menus.ItemsMenu;
 import com.github.jewishbanana.uiframework.listeners.menus.MenuManager;
+import com.github.jewishbanana.uiframework.listeners.menus.RecipeMenu;
+import com.github.jewishbanana.uiframework.utils.AnvilRecipe;
 import com.github.jewishbanana.uiframework.utils.ConfigUpdater;
 import com.github.jewishbanana.uiframework.utils.Metrics;
 import com.github.jewishbanana.uiframework.utils.UIFDataUtils;
@@ -35,6 +40,7 @@ public class UIFramework extends JavaPlugin {
 	public FixedMetadataValue fixedData;
 	private static Map<JavaPlugin, Runnable> reloadRunnables = new HashMap<>();
 	public static boolean debugMessages;
+	private static ItemListener itemListener;
 	
 	@SuppressWarnings("deprecation")
 	public void onEnable() {
@@ -87,26 +93,28 @@ public class UIFramework extends JavaPlugin {
 			consoleSender.sendMessage(UIFUtils.convertString(UIFUtils.prefix+"&cERROR your data.yml file has a formatting error and cannot properly be read! This is likely due to user modification or file corruption. Saved data related to custom items and configurations will not be loaded!"));
 		}
 		
-		ItemType.registerItem("uif:recipe_book", RecipeBook.class);
+		UIItemType.registerItem("uif:recipe_book", RecipeBook.class);
 		saveDataFile();
 		init();
-		ItemType.registerDefaults();
+		UIItemType.registerDefaults();
 	}
 	private void init() {
 		UIFUtils.descriptionLine = UIFDataUtils.getConfigInt("general.lore_line_length");
 		this.getCommand("uiframework").setTabCompleter(new UICommand(this));
-		AbilityType.init(this);
+		UIAbilityType.init(this);
 		
 		reload();
 		
 		new AbilityListener(this);
-		new ItemListener(this);
+		itemListener = new ItemListener(this);
 		new MenuManager(this);
+		new EntitiesListener(this);
 		
 		getServer().getScheduler().runTaskLater(this, () -> Metrics.configureMetrics(instance), 40);
 	}
 	public void onDisable() {
-		ItemType.cleanAbilities();
+		UIItemType.cleanAbilities();
+		UIEntityManager.unloadEntities();
 		if (new File(getDataFolder().getAbsolutePath(), "data.yml").exists()) {
 			GenericItem.unloadItems();
 			saveDataFile();
@@ -114,9 +122,6 @@ public class UIFramework extends JavaPlugin {
 	}
 	public void reload() {
 		reloadConfig();
-		GenericItem.unloadItems();
-		Ability.pluginReload();
-		debugMessages = UIFDataUtils.getConfigBoolean("general.debug_messages");
 		reloadRunnables.forEach((k, v) -> {
 			try {
 				v.run();
@@ -125,6 +130,13 @@ public class UIFramework extends JavaPlugin {
 				consoleSender.sendMessage(UIFUtils.convertString("&e[UIFramework]: An error has occurred while &d"+k.getName()+" &etried to reload with UIFramework! This is NOT a UIFramework bug! Report this to the proper plugin author(s): "+k.getDescription().getAuthors().toString()));
 			}
 		});
+		ItemsMenu.reload();
+		RecipeMenu.reload();
+		GenericItem.unloadItems();
+		Ability.pluginReload();
+		UIEntityManager.reload(this);
+		debugMessages = UIFDataUtils.getConfigBoolean("general.debug_messages");
+		UIItemType.getRegistry().values().forEach(temp -> temp.updateRecipeResults());
 	}
 	/**
 	 * Gets the user configured language string from the UIFramework lang yaml config.
@@ -188,5 +200,8 @@ public class UIFramework extends JavaPlugin {
 		} catch (NumberFormatException ex) {
 			throw new NumberFormatException("The version string you supplied '"+version+"' is not a valid version string! Format must be as follows: '1.2.3' or '1.2' or '1'!");
 		}
+	}
+	public static void registerAnvilRecipe(AnvilRecipe recipe) {
+		itemListener.anvilRecipes.add(recipe);
 	}
 }

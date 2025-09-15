@@ -51,7 +51,7 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import com.github.jewishbanana.uiframework.UIFramework;
-import com.github.jewishbanana.uiframework.items.ItemType;
+import com.github.jewishbanana.uiframework.items.UIItemType;
 
 public class Metrics {
 
@@ -66,7 +66,7 @@ public class Metrics {
 	        @Override
 	        public Map<String, Integer> call() throws Exception {
 	        	Map<String, Integer> map = new HashMap<>();
-	        	int amount = ItemType.getAllItems().size();
+	        	int amount = UIItemType.getRegistry().size();
 	        	if (amount < 5)
 	        		map.put("Less Than 5", 1);
 	        	else if (amount < 10)

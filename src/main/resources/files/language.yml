@@ -1,5 +1,6 @@
 # Actions binds for abilities on custom items
 action:
+    interaction: "&b[Interaction]"
     left_click: "&b[Left-Click]"
     left_click_block: "&b[Left-Click-Block]"
     shift_left_click: "&b[Shift-Left-Click]"
@@ -33,6 +34,7 @@ items:
 menu:
     recipe: "Recipes"
     creates: "&aCreates ->"
+    combined: "&eCombines With +"
     page: "&aPage %number%"
     recipeInfo: "&bClick on any item to view its recipes."
     removeRecipe: "&cClick to remove this recipe."
@@ -45,3 +47,9 @@ menu:
     creationRecipes: "%value% Creation Recipe(s)"
     usedRecipes: "Used In %value% Recipe(s)"
     giveItem: "&7[Right-Click] &8- &6To give yourself this item."
+    category: "Category"
+    craftingTableRecipe: "Created in a crafting grid"
+    anvilRecipe: "Created in an anvil"
+commands:
+    console_error_message: "&cUnable to execute command from console!"
+    permission_error: "&cYou do not have permission to use that!"
