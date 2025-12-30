@@ -55,7 +55,7 @@ public class UICommand implements CommandExecutor, TabCompleter {
 			return true;
 		}
 		switch (args[0].toLowerCase()) {
-		case "give":
+		case "give" -> {
 			if (!(sender instanceof Player)) {
 				if (args.length < 3 || args.length > 4) {
 					sender.sendMessage("Usage: /uiframework give <item> <player> [amount]");
@@ -117,7 +117,8 @@ public class UICommand implements CommandExecutor, TabCompleter {
 			sender.sendMessage(UIFUtils.convertString("&aGave &b"+given+" &a["+giveBase.getDisplayName()+"&a] to "+target.getName()));
 			target.playSound(target.getLocation(), Sound.ENTITY_ITEM_PICKUP, 1, 1);
 			return true;
-		case "reload":
+		}
+		case "reload" -> {
 			if (sender instanceof Player && !sender.hasPermission("uiframework.reload")) {
 				sender.sendMessage(UIFUtils.convertString(UIFramework.getLangString("commands.permission_error")));
 				return true;
@@ -125,7 +126,8 @@ public class UICommand implements CommandExecutor, TabCompleter {
 			plugin.reload();
 			sender.sendMessage(UIFUtils.convertString(UIFUtils.prefix+"&aSuccessfully reloaded the config!"));
 			return true;
-		case "recipes":
+		}
+		case "recipes" -> {
 			if (!(sender instanceof Player)) {
 				sender.sendMessage(UIFUtils.convertString(UIFramework.getLangString("commands.console_error_message")));
 				return true;
@@ -152,7 +154,8 @@ public class UICommand implements CommandExecutor, TabCompleter {
 			MenuManager.registerInventory(menu.getInventory(), menu);
 			((Player) sender).openInventory(menu.getInventory());
 			return true;
-		case "enchant":
+		}
+		case "enchant" -> {
 			if (!(sender instanceof Player)) {
 				sender.sendMessage(UIFUtils.convertString(UIFramework.getLangString("commands.console_error_message")));
 				return true;
@@ -221,7 +224,8 @@ public class UICommand implements CommandExecutor, TabCompleter {
 			}
 			sender.sendMessage(UIFUtils.convertString("&cFailed to apply the custom enchant to your hand item!"));
 			return true;
-		case "summon":
+		}
+		case "summon" -> {
 			Location toSpawn = null;
 			Player targetToSpawn = null;
 			if (sender instanceof Player) {
@@ -287,7 +291,8 @@ public class UICommand implements CommandExecutor, TabCompleter {
 			}
 			sender.sendMessage(UIFUtils.convertString("&aSummoned &f"+customEntity.getDisplayName()+" &aat &b"+toSpawn.getBlockX()+' '+toSpawn.getBlockY()+' '+toSpawn.getBlockZ()+(spawnWorld == null ? "" : " &9("+toSpawn.getWorld().getName()+')')));
 			return true;
-		case "entities":
+		}
+		case "entities" -> {
 			if (sender instanceof Player) {
 				if (!sender.hasPermission("uiframework.entities")) {
 					sender.sendMessage(UIFUtils.convertString(UIFramework.getLangString("commands.permission_error")));
@@ -397,8 +402,8 @@ public class UICommand implements CommandExecutor, TabCompleter {
 			}
 			sender.sendMessage(UIFUtils.convertString("&cUsage: /uiframework entities <list|kill> [species] [world]"));
 			return true;
-		default:
-			break;
+		}
+		default -> {}
 		}
 		if (sender instanceof Player && !sender.hasPermission("uiframework.*")) {
 			sender.sendMessage(UIFUtils.convertString(UIFramework.getLangString("commands.permission_error")));
@@ -412,10 +417,7 @@ public class UICommand implements CommandExecutor, TabCompleter {
 		List<String> list = new ArrayList<>();
 		String keyword;
 		switch (args.length) {
-		default:
-		case 0:
-			return list;
-		case 1:
+		case 1 -> {
 			keyword = args[0].toLowerCase();
 			if (sender.hasPermission("uiframework.give"))
 				list.add("give");
@@ -429,56 +431,57 @@ public class UICommand implements CommandExecutor, TabCompleter {
 				list.add("summon");
 			if (sender.hasPermission("uiframework.entities"))
 				list.add("entities");
-			list.removeIf(e -> !e.contains(keyword));
-			break;
-		case 2:
+			list.removeIf(e -> !e.toLowerCase().contains(keyword));
+		}
+		case 2 -> {
 			keyword = args[1].toLowerCase();
 			if ((args[0].equalsIgnoreCase("give") && sender.hasPermission("uiframework.give")) || (args[0].equalsIgnoreCase("recipes") && sender.hasPermission("uiframework.recipes"))) {
-				list.addAll(UIItemType.getRegistry().keySet().stream().filter(e -> !e.equals("_null") && e.contains(keyword)).collect(Collectors.toList()));
+				list.addAll(UIItemType.getRegistry().keySet().stream().filter(e -> !e.equals("_null") && e.toLowerCase().contains(keyword)).collect(Collectors.toList()));
 				return list;
 			}
 			if (args[0].equalsIgnoreCase("enchant") && sender.hasPermission("uiframework.enchant")) {
-				list.addAll(UIEnchantment.getRegistry().keySet().stream().filter(e -> e.contains(keyword)).collect(Collectors.toList()));
+				list.addAll(UIEnchantment.getRegistry().keySet().stream().filter(e -> e.toLowerCase().contains(keyword)).collect(Collectors.toList()));
 				return list;
 			}
 			if (args[0].equalsIgnoreCase("summon") && sender.hasPermission("uiframework.summon")) {
-				list.addAll(UIEntityManager.getRegistry().keySet().stream().filter(e -> e.contains(keyword)).collect(Collectors.toList()));
+				list.addAll(UIEntityManager.getRegistry().keySet().stream().filter(e -> e.toLowerCase().contains(keyword)).collect(Collectors.toList()));
 				return list;
 			}
 			if (args[0].equalsIgnoreCase("entities") && sender.hasPermission("uiframework.entities")) {
-				list.addAll(Arrays.asList("list", "kill").stream().filter(e -> e.contains(keyword)).collect(Collectors.toList()));
+				list.addAll(Arrays.asList("list", "kill").stream().filter(e -> e.toLowerCase().contains(keyword)).collect(Collectors.toList()));
 				return list;
 			}
-			break;
-		case 3:
+		}
+		case 3 -> {
 			keyword = args[2].toLowerCase();
 			if ((args[0].equalsIgnoreCase("give") && sender.hasPermission("uiframework.give")) || (args[0].equalsIgnoreCase("summon") && sender.hasPermission("uiframework.summon"))) {
-				list.addAll(Bukkit.getServer().getOnlinePlayers().stream().map(p -> p.getName()).filter(e -> e.contains(keyword)).collect(Collectors.toList()));
+				list.addAll(Bukkit.getServer().getOnlinePlayers().stream().map(p -> p.getName()).filter(e -> e.toLowerCase().contains(keyword)).collect(Collectors.toList()));
 				return list;
 			}
 			if (args[0].equalsIgnoreCase("entities") && sender.hasPermission("uiframework.entities")) {
-				list.addAll(UIEntityManager.getRegistry().keySet().stream().filter(e -> e.contains(keyword)).collect(Collectors.toList()));
+				list.addAll(UIEntityManager.getRegistry().keySet().stream().filter(e -> e.toLowerCase().contains(keyword)).collect(Collectors.toList()));
 				return list;
 			}
-			break;
-		case 4:
+		}
+		case 4 -> {
 			keyword = args[3].toLowerCase();
 			if (args[0].equalsIgnoreCase("enchant") && sender.hasPermission("uiframework.enchant")) {
-				list.addAll(Arrays.asList("true", "false").stream().filter(e -> e.contains(keyword)).collect(Collectors.toList()));
+				list.addAll(Arrays.asList("true", "false").stream().filter(e -> e.toLowerCase().contains(keyword)).collect(Collectors.toList()));
 				return list;
 			}
 			if (args[0].equalsIgnoreCase("entities") && sender.hasPermission("uiframework.entities")) {
-				list.addAll(Bukkit.getWorlds().stream().filter(e -> e.getName().contains(keyword)).map(e -> e.getName()).collect(Collectors.toList()));
+				list.addAll(Bukkit.getWorlds().stream().filter(e -> e.getName().toLowerCase().contains(keyword)).map(e -> e.getName()).collect(Collectors.toList()));
 				return list;
 			}
-			break;
-		case 6:
+		}
+		case 6 -> {
 			keyword = args[5].toLowerCase();
 			if (args[0].equalsIgnoreCase("summon") && sender.hasPermission("uiframework.summon")) {
-				list.addAll(Bukkit.getWorlds().stream().filter(e -> e.getName().contains(keyword)).map(e -> e.getName()).collect(Collectors.toList()));
+				list.addAll(Bukkit.getWorlds().stream().filter(e -> e.getName().toLowerCase().contains(keyword)).map(e -> e.getName()).collect(Collectors.toList()));
 				return list;
 			}
-			break;
+		}
+		default -> { return list; }
 		}
 		return list;
 	}
