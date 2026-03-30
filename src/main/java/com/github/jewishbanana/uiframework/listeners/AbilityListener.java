@@ -2,6 +2,7 @@ package com.github.jewishbanana.uiframework.listeners;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.UUID;
 
 import org.bukkit.Bukkit;
@@ -66,7 +67,7 @@ public class AbilityListener implements Listener {
 				boolean flag = k.isAlwaysAllowAbilities();
 				if (UIFUtils.isActivatingSlot(v, k.getActivatingSlot(), hand, k))
 					flag = k.interacted(event);
-				k.getEnchants().forEach((enchant, level) -> {
+				k.getEnchants().keySet().forEach(enchant -> {
 					if (UIFUtils.isActivatingSlot(v, enchant.getActivatingSlot(), hand, k)) {
 						EnchantTriggerEvent enchantTrigger = new EnchantTriggerEvent(enchant, Ability.Action.INTERACTION, k, event.getPlayer());
 						manager.callEvent(enchantTrigger);
@@ -108,7 +109,7 @@ public class AbilityListener implements Listener {
 				boolean flag = k.isAlwaysAllowAbilities();
 				if (UIFUtils.isActivatingSlot(v, k.getActivatingSlot(), hand, k))
 					flag = k.interactedEntity(event);
-				k.getEnchants().forEach((enchant, level) -> {
+				k.getEnchants().keySet().forEach(enchant -> {
 					if (UIFUtils.isActivatingSlot(v, k.getActivatingSlot(), hand, k)) {
 						EnchantTriggerEvent enchantTrigger = new EnchantTriggerEvent(enchant, Ability.Action.INTERACT_ENTITY, k, event.getPlayer());
 						manager.callEvent(enchantTrigger);
@@ -122,34 +123,36 @@ public class AbilityListener implements Listener {
 	}
 	@EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
 	public void onHitEntity(EntityDamageByEntityEvent event) {
-		if (event.getDamager() instanceof Projectile && itemProjectiles.containsKey(event.getDamager().getUniqueId())) {
-			Pair<GenericItem, GenericItem> pair = itemProjectiles.remove(event.getDamager().getUniqueId());
+		if (event.getDamager() instanceof Projectile damager && itemProjectiles.containsKey(damager.getUniqueId())) {
+			Pair<GenericItem, GenericItem> pair = itemProjectiles.remove(damager.getUniqueId());
 			if (pair.getSecond() != null && pair.getSecond().getType().getProjectileDamage() != 0.0)
 				event.setDamage(pair.getSecond().getType().getProjectileDamage());
 			if (pair.getFirst() != null)
 				event.setDamage(event.getDamage() * pair.getFirst().getType().getProjectileDamageMultiplier());
 		}
-		if (event.getDamager() instanceof LivingEntity) {
-			Map<GenericItem, ActivatedSlot> map = UIFUtils.getEntityContents((LivingEntity) event.getDamager());
+		if (event.getDamager() instanceof LivingEntity living) {
+			Map<GenericItem, ActivatedSlot> map = UIFUtils.getEntityContents(living);
 			if (!map.isEmpty()) {
-				if (map.entrySet().iterator().next().getValue() == ActivatedSlot.MAIN_HAND) {
-					GenericItem type = map.entrySet().iterator().next().getKey();
-					double damage = type.getType().getDamage();
+				GenericItem mainHand = null;
+				for (Entry<GenericItem, ActivatedSlot> entry : map.entrySet())
+					if (entry.getValue() == ActivatedSlot.MAIN_HAND) {
+						mainHand = entry.getKey();
+						break;
+					}
+				if (mainHand != null) {
+					double damage = mainHand.getType().getDamage();
 					if (damage > 0.0 && event.getCause() == DamageCause.ENTITY_ATTACK) {
-						if (event.getDamager() instanceof LivingEntity) {
-							LivingEntity entity = (LivingEntity) event.getDamager();
-							double enchantDamage = UIFUtils.getEnchantDamage(type.getItem(), (event.getEntity() instanceof LivingEntity ? (LivingEntity) event.getEntity() : null));
-							if (entity.hasPotionEffect(VersionUtils.getStrength()))
-								damage += entity.getPotionEffect(VersionUtils.getStrength()).getAmplifier() * 3.0;
-							if (event.getDamager() instanceof Player) {
-								double cooldown = ((Player) event.getDamager()).getAttackCooldown();
-								damage *= 0.2 + ((cooldown * cooldown) * 0.8);
-								damage += (enchantDamage * cooldown);
-							}
-							if (event.getEntity() instanceof LivingEntity && entity.getFallDistance() > 0.0 && !entity.isOnGround() && !entity.isClimbing() && !entity.isInWater() && !entity.hasPotionEffect(PotionEffectType.BLINDNESS) && !entity.hasPotionEffect(PotionEffectType.SLOW_FALLING)
-									&& !entity.isInsideVehicle() && !(entity instanceof Player && (((Player) entity).isSprinting() || ((Player) entity).getAttackCooldown() < 0.9)))
-								damage *= 1.5;
+						double enchantDamage = UIFUtils.getEnchantDamage(mainHand.getItem(), (event.getEntity() instanceof LivingEntity damaged ? damaged : null));
+						if (living.hasPotionEffect(VersionUtils.getStrength()))
+							damage += living.getPotionEffect(VersionUtils.getStrength()).getAmplifier() * 3.0;
+						if (living instanceof Player player) {
+							double cooldown = player.getAttackCooldown();
+							damage *= 0.2 + ((cooldown * cooldown) * 0.8);
+							damage += (enchantDamage * cooldown);
 						}
+						if (event.getEntity() instanceof LivingEntity && living.getFallDistance() > 0.0 && !living.isOnGround() && !living.isClimbing() && !living.isInWater() && !living.hasPotionEffect(PotionEffectType.BLINDNESS) && !living.hasPotionEffect(PotionEffectType.SLOW_FALLING)
+								&& !living.isInsideVehicle() && !(living instanceof Player player && (player.isSprinting() || player.getAttackCooldown() < 0.9)))
+							damage *= 1.5;
 						event.setDamage(damage);
 					}
 				}
@@ -157,7 +160,7 @@ public class AbilityListener implements Listener {
 					boolean flag = k.isAlwaysAllowAbilities();
 					if (UIFUtils.isActivatingSlot(v, k.getActivatingSlot(), ActivatedSlot.MAIN_HAND, k))
 						flag = k.hitEntity(event);
-					k.getEnchants().forEach((enchant, level) -> {
+					k.getEnchants().keySet().forEach(enchant -> {
 						if (UIFUtils.isActivatingSlot(v, k.getActivatingSlot(), ActivatedSlot.MAIN_HAND, k)) {
 							EnchantTriggerEvent enchantTrigger = new EnchantTriggerEvent(enchant, Ability.Action.HIT_ENTITY, k, event.getDamager());
 							manager.callEvent(enchantTrigger);
@@ -172,14 +175,14 @@ public class AbilityListener implements Listener {
 		}
 		if (event.isCancelled())
 			return;
-		if (event.getEntity() instanceof LivingEntity) {
-			Map<GenericItem, ActivatedSlot> map = UIFUtils.getEntityContents((LivingEntity) event.getEntity());
+		if (event.getEntity() instanceof LivingEntity living) {
+			Map<GenericItem, ActivatedSlot> map = UIFUtils.getEntityContents(living);
 			if (!map.isEmpty())
 				map.forEach((k, v) -> {
 					boolean flag = k.isAlwaysAllowAbilities();
 					if (UIFUtils.isActivatingSlot(v, k.getActivatingSlot(), ActivatedSlot.ARMOR, k))
 						flag = k.wasHit(event);
-					k.getEnchants().forEach((enchant, level) -> {
+					k.getEnchants().keySet().forEach(enchant -> {
 						if (UIFUtils.isActivatingSlot(v, k.getActivatingSlot(), ActivatedSlot.ARMOR, k)) {
 							EnchantTriggerEvent enchantTrigger = new EnchantTriggerEvent(enchant, Ability.Action.WAS_HIT, k, event.getEntity());
 							manager.callEvent(enchantTrigger);
@@ -194,11 +197,11 @@ public class AbilityListener implements Listener {
 	}
 	@EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
 	public void onProjectileThrown(ProjectileLaunchEvent event) {
-		if (event.getEntity() instanceof ThrowableProjectile) {
-			GenericItem base = GenericItem.getItemBase(((ThrowableProjectile) event.getEntity()).getItem());
+		if (event.getEntity() instanceof ThrowableProjectile projectile) {
+			GenericItem base = GenericItem.getItemBase(projectile.getItem());
 			if (base != null) {
 				boolean flag = base.projectileThrown(event);
-				base.getEnchants().forEach((enchant, level) -> {
+				base.getEnchants().keySet().forEach(enchant -> {
 					EnchantTriggerEvent enchantTrigger = new EnchantTriggerEvent(enchant, Ability.Action.WAS_THROWN, base, event.getEntity());
 					manager.callEvent(enchantTrigger);
 					if (!enchantTrigger.isCancelled())
@@ -212,12 +215,12 @@ public class AbilityListener implements Listener {
 	}
 	@EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
 	public void onProjectileHit(ProjectileHitEvent event) {
-		if (event.getEntity() instanceof ThrowableProjectile) {
-			ItemStack item = ((ThrowableProjectile) event.getEntity()).getItem();
+		if (event.getEntity() instanceof ThrowableProjectile projectile) {
+			ItemStack item = projectile.getItem();
 			GenericItem base = GenericItem.getItemBase(item);
 			if (base != null) {
 				boolean flag = base.projectileHit(event);
-				base.getEnchants().forEach((enchant, level) -> {
+				base.getEnchants().keySet().forEach(enchant -> {
 					EnchantTriggerEvent enchantTrigger = new EnchantTriggerEvent(enchant, Ability.Action.PROJECTILE_HIT, base, event.getEntity());
 					manager.callEvent(enchantTrigger);
 					if (!enchantTrigger.isCancelled())
@@ -232,7 +235,7 @@ public class AbilityListener implements Listener {
 				GenericItem base = itemPair.getFirst();
 				if (base != null) {
 					boolean flag = base.projectileHit(event);
-					base.getEnchants().forEach((enchant, level) -> {
+					base.getEnchants().keySet().forEach(enchant -> {
 						EnchantTriggerEvent enchantTrigger = new EnchantTriggerEvent(enchant, Ability.Action.PROJECTILE_HIT, itemPair.getFirst(), event.getEntity());
 						manager.callEvent(enchantTrigger);
 						if (!enchantTrigger.isCancelled())
@@ -244,7 +247,7 @@ public class AbilityListener implements Listener {
 				base = itemPair.getSecond();
 				if (base != null) {
 					boolean flag = base.projectileHit(event);
-					base.getEnchants().forEach((enchant, level) -> {
+					base.getEnchants().keySet().forEach(enchant -> {
 						EnchantTriggerEvent enchantTrigger = new EnchantTriggerEvent(enchant, Ability.Action.PROJECTILE_HIT, itemPair.getSecond(), event.getEntity());
 						manager.callEvent(enchantTrigger);
 						if (!enchantTrigger.isCancelled())
@@ -258,14 +261,14 @@ public class AbilityListener implements Listener {
 			if (pair != null)
 				pair.getFirst().projectileHit(event, pair.getSecond());
 		}
-		if (event.getHitEntity() != null && event.getHitEntity() instanceof LivingEntity) {
-			Map<GenericItem, ActivatedSlot> map = UIFUtils.getEntityContents((LivingEntity) event.getHitEntity());
+		if (event.getHitEntity() != null && event.getHitEntity() instanceof LivingEntity hitEntity) {
+			Map<GenericItem, ActivatedSlot> map = UIFUtils.getEntityContents(hitEntity);
 			if (!map.isEmpty())
 				map.forEach((k, v) -> {
 					boolean flag = k.isAlwaysAllowAbilities();
 					if (UIFUtils.isActivatingSlot(v, k.getActivatingSlot(), ActivatedSlot.ARMOR, k))
 						flag = k.hitByProjectile(event);
-					k.getEnchants().forEach((enchant, level) -> {
+					k.getEnchants().keySet().forEach(enchant -> {
 						if (UIFUtils.isActivatingSlot(v, k.getActivatingSlot(), ActivatedSlot.ARMOR, k)) {
 							EnchantTriggerEvent enchantTrigger = new EnchantTriggerEvent(enchant, Ability.Action.HIT_BY_PROJECTILE, k, event.getHitEntity());
 							manager.callEvent(enchantTrigger);
@@ -284,7 +287,7 @@ public class AbilityListener implements Listener {
 		GenericItem arrow = event.shouldConsumeItem() ? GenericItem.getItemBase(event.getConsumable()) : null;
 		if (base != null) {
 			boolean flag = base.shotBow(event);
-			base.getEnchants().forEach((enchant, level) -> {
+			base.getEnchants().keySet().forEach(enchant -> {
 				EnchantTriggerEvent enchantTrigger = new EnchantTriggerEvent(enchant, Ability.Action.SHOT_BOW, base, event.getEntity());
 				manager.callEvent(enchantTrigger);
 				if (!enchantTrigger.isCancelled())
@@ -303,7 +306,7 @@ public class AbilityListener implements Listener {
 		GenericItem base = GenericItem.getItemBase(event.getCurrentItem());
 		if (base != null) {
 			boolean flag = base.inventoryClick(event);
-			base.getEnchants().forEach((enchant, level) -> {
+			base.getEnchants().keySet().forEach(enchant -> {
 				EnchantTriggerEvent enchantTrigger = new EnchantTriggerEvent(enchant, Ability.Action.INVENTORY_CLICK, base, event.getWhoClicked());
 				manager.callEvent(enchantTrigger);
 				if (!enchantTrigger.isCancelled())
@@ -318,7 +321,7 @@ public class AbilityListener implements Listener {
 		GenericItem base = GenericItem.getItemBase(event.getItem());
 		if (base != null) {
 			boolean flag = base.consumeItem(event);
-			base.getEnchants().forEach((enchant, level) -> {
+			base.getEnchants().keySet().forEach(enchant -> {
 				EnchantTriggerEvent enchantTrigger = new EnchantTriggerEvent(enchant, Ability.Action.CONSUME, base, event.getPlayer());
 				manager.callEvent(enchantTrigger);
 				if (!enchantTrigger.isCancelled())
@@ -333,7 +336,7 @@ public class AbilityListener implements Listener {
 		GenericItem base = GenericItem.getItemBase(event.getPotion().getItem());
 		if (base != null) {
 			boolean flag = base.splashPotion(event);
-			base.getEnchants().forEach((enchant, level) -> {
+			base.getEnchants().keySet().forEach(enchant -> {
 				EnchantTriggerEvent enchantTrigger = new EnchantTriggerEvent(enchant, Ability.Action.SPLASH_POTION, base, event.getPotion());
 				manager.callEvent(enchantTrigger);
 				if (!enchantTrigger.isCancelled())
@@ -348,7 +351,7 @@ public class AbilityListener implements Listener {
 		GenericItem base = GenericItem.getItemBase(event.getItemDrop().getItemStack());
 		if (base != null) {
 			boolean flag = base.dropItem(event);
-			base.getEnchants().forEach((enchant, level) -> {
+			base.getEnchants().keySet().forEach(enchant -> {
 				EnchantTriggerEvent enchantTrigger = new EnchantTriggerEvent(enchant, Ability.Action.DROP_ITEM, base, event.getEntity());
 				manager.callEvent(enchantTrigger);
 				if (!enchantTrigger.isCancelled())
@@ -363,7 +366,7 @@ public class AbilityListener implements Listener {
 		GenericItem base = GenericItem.getItemBase(event.getItem().getItemStack());
 		if (base != null) {
 			boolean flag = base.pickupItem(event);
-			base.getEnchants().forEach((enchant, level) -> {
+			base.getEnchants().keySet().forEach(enchant -> {
 				EnchantTriggerEvent enchantTrigger = new EnchantTriggerEvent(enchant, Ability.Action.PICKUP_ITEM, base, event.getEntity());
 				manager.callEvent(enchantTrigger);
 				if (!enchantTrigger.isCancelled())
@@ -379,7 +382,7 @@ public class AbilityListener implements Listener {
 			boolean flag = k.isAlwaysAllowAbilities();
 			if (UIFUtils.isActivatingSlot(v, k.getActivatingSlot(), ActivatedSlot.ANY, k))
 				flag = k.entityDeath(event);
-			k.getEnchants().forEach((enchant, level) -> {
+			k.getEnchants().keySet().forEach(enchant -> {
 				EnchantTriggerEvent enchantTrigger = new EnchantTriggerEvent(enchant, Ability.Action.ENTITY_DEATH, k, event.getEntity());
 				manager.callEvent(enchantTrigger);
 				if (!enchantTrigger.isCancelled())
@@ -395,7 +398,7 @@ public class AbilityListener implements Listener {
 			boolean flag = k.isAlwaysAllowAbilities();
 			if (UIFUtils.isActivatingSlot(v, k.getActivatingSlot(), ActivatedSlot.ANY, k))
 				flag = k.entityRespawn(event);
-			k.getEnchants().forEach((enchant, level) -> {
+			k.getEnchants().keySet().forEach(enchant -> {
 				EnchantTriggerEvent enchantTrigger = new EnchantTriggerEvent(enchant, Ability.Action.ENTITY_RESPAWN, k, event.getPlayer());
 				manager.callEvent(enchantTrigger);
 				if (!enchantTrigger.isCancelled())
@@ -410,7 +413,7 @@ public class AbilityListener implements Listener {
 		GenericItem base = GenericItem.getItemBase(event.getItemInHand());
 		if (base != null) {
 			boolean flag = base.placeBlock(event);
-			base.getEnchants().forEach((enchant, level) -> {
+			base.getEnchants().keySet().forEach(enchant -> {
 				EnchantTriggerEvent enchantTrigger = new EnchantTriggerEvent(enchant, Ability.Action.PLACE_BLOCK, base, event.getPlayer());
 				manager.callEvent(enchantTrigger);
 				if (!enchantTrigger.isCancelled())
@@ -425,7 +428,7 @@ public class AbilityListener implements Listener {
 		GenericItem base = GenericItem.getItemBase(event.getPlayer().getEquipment().getItemInMainHand());
 		if (base != null) {
 			boolean flag = base.breakBlock(event);
-			base.getEnchants().forEach((enchant, level) -> {
+			base.getEnchants().keySet().forEach(enchant -> {
 				EnchantTriggerEvent enchantTrigger = new EnchantTriggerEvent(enchant, Ability.Action.BREAK_BLOCK, base, event.getPlayer());
 				manager.callEvent(enchantTrigger);
 				if (!enchantTrigger.isCancelled())

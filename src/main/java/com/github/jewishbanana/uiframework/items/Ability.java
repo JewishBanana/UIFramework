@@ -1,5 +1,6 @@
 package com.github.jewishbanana.uiframework.items;
 
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -30,18 +31,19 @@ import com.github.jewishbanana.uiframework.utils.UIFUtils;
 
 public class Ability {
 	
+	private static boolean opCooldowns;
+	private static boolean immuneCooldowns;
+	private static boolean cooldownMessages;
+	private static boolean chatMessages;
+	
 	private UIAbilityType type;
 	private int cooldownTicks;
 	private ActivatedSlot activatingSlot = ActivatedSlot.PARENT;
 	private String displayName;
 	private String description;
+	private final Map<String, StoredField<?>> fields = new HashMap<>();
 	
 	protected boolean persist;
-	
-	private static boolean opCooldowns;
-	private static boolean immuneCooldowns;
-	private static boolean cooldownMessages;
-	private static boolean chatMessages;
 	
 	public Ability(UIAbilityType type) {
 		this.type = type;
@@ -68,21 +70,22 @@ public class Ability {
 	public boolean use(Entity entity, boolean sendMessage) {
 		if (entity == null)
 			return false;
-		if (entity instanceof Player && ((!opCooldowns && entity.isOp()) || (!immuneCooldowns && UIFUtils.isPlayerImmune((Player) entity))))
+		if (entity instanceof Player player && ((!opCooldowns && entity.isOp()) || (!immuneCooldowns && UIFUtils.isPlayerImmune(player))))
 			return true;
-		if (type.isEntityOnCooldown(entity.getUniqueId())) {
-			if (cooldownMessages && sendMessage && entity instanceof Player)
+		UUID uuid = entity.getUniqueId();
+		if (type.isEntityOnCooldown(uuid)) {
+			if (cooldownMessages && sendMessage && entity instanceof Player player)
 				if (chatMessages)
-					((Player) entity).sendMessage(UIFUtils.convertString(UIFDataUtils.getConfigString("messages.abilityCooldown")
-							.replace("%cooldown%", UIFDataUtils.getDecimalFormatted((double) (type.getEntityCooldown(entity.getUniqueId())) / 20.0))
+					player.sendMessage(UIFUtils.convertString(UIFDataUtils.getConfigString("messages.abilityCooldown")
+							.replace("%cooldown%", UIFDataUtils.getDecimalFormatted((double) (type.getEntityCooldown(uuid)) / 20.0))
 							.replace("%ability%", type.getDisplayName())));
 				else
-					((Player) entity).spigot().sendMessage(net.md_5.bungee.api.ChatMessageType.ACTION_BAR, new net.md_5.bungee.api.chat.TextComponent(UIFUtils.convertString(UIFDataUtils.getConfigString("messages.abilityCooldown")
-							.replace("%cooldown%", UIFDataUtils.getDecimalFormatted((double) (type.getEntityCooldown(entity.getUniqueId())) / 20.0))
+					player.spigot().sendMessage(net.md_5.bungee.api.ChatMessageType.ACTION_BAR, new net.md_5.bungee.api.chat.TextComponent(UIFUtils.convertString(UIFDataUtils.getConfigString("messages.abilityCooldown")
+							.replace("%cooldown%", UIFDataUtils.getDecimalFormatted((double) (type.getEntityCooldown(uuid)) / 20.0))
 							.replace("%ability%", type.getDisplayName()))));
 			return false;
 		} else {
-			type.putEntityOnCooldown(entity.getUniqueId(), getCooldownTicks());
+			type.putEntityOnCooldown(uuid, getCooldownTicks());
 			return true;
 		}
 	}
@@ -232,14 +235,33 @@ public class Ability {
 	public Map<String, Object> serialize() {
 		Map<String, Object> map = new LinkedHashMap<>();
 		map.put("_abilityType", type.getRegisteredName());
-		map.put("_cooldownTicks", cooldownTicks);
-		map.put("_activatingSlot", activatingSlot.toString());
+		fields.entrySet().stream().filter(entry -> entry.getValue().persists).forEach(entry -> map.put(entry.getKey(), entry.getValue().value));
 		return map;
 	}
 	public void deserialize(Map<String, Object> map) {
-		type = UIAbilityType.getAbilityType((String) map.get("_abilityType"));
-		cooldownTicks = (int) map.get("_cooldownTicks");
-		activatingSlot = ActivatedSlot.valueOf((String) map.get("_activatingSlot"));
+		cooldownTicks = registerSerializedField("_cooldownTicks", map, 0).getValue();
+		activatingSlot = ActivatedSlot.valueOf(registerSerializedField("_activatingSlot", map, getActivatingSlot().toString()).getValue());
+	}
+	@SuppressWarnings("unchecked")
+	public <T> StoredField<T> registerSerializedField(String identifier, Map<String, Object> map, T value, boolean persists) {
+		T stored = (T) map.get(identifier);
+		if (stored != null)
+			return registerField(identifier, stored, true);
+		return registerField(identifier, value, persists);
+	}
+	public <T> StoredField<T> registerSerializedField(String identifier, Map<String, Object> map, T value) {
+		return registerSerializedField(identifier, map, value, false);
+	}
+	public <T> StoredField<T> registerField(String identifier, T value, boolean persists) {
+		StoredField<T> field = new StoredField<T>(value, persists);
+		this.fields.put(identifier, field);
+		return field;
+	}
+	public <T> StoredField<T> registerField(String identifier, T value) {
+		return registerField(identifier, value, false);
+	}
+	public Map<String, StoredField<?>> getFields() {
+		return fields;
 	}
 	public static void pluginReload() {
 		opCooldowns = UIFDataUtils.getConfigBoolean("general.give_op_cooldowns");

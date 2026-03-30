@@ -23,11 +23,13 @@ import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
+import org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason;
 import org.bukkit.inventory.ItemStack;
 
 import com.github.jewishbanana.uiframework.UIFramework;
 import com.github.jewishbanana.uiframework.entities.CustomEntity;
 import com.github.jewishbanana.uiframework.entities.UIEntityManager;
+import com.github.jewishbanana.uiframework.events.CustomEntitySpawnEvent;
 import com.github.jewishbanana.uiframework.items.GenericItem;
 import com.github.jewishbanana.uiframework.items.UIEnchantment;
 import com.github.jewishbanana.uiframework.items.UIItemType;
@@ -287,6 +289,15 @@ public class UICommand implements CommandExecutor, TabCompleter {
 			CustomEntity<? extends Entity> customEntity = UIEntityManager.spawnEntity(parameters.location, type.getEntityClass());
 			if (customEntity == null) {
 				sender.sendMessage(UIFUtils.convertString("&cAn error occurred while trying to spawn this entity!"));
+				return true;
+			}
+			Entity spawned = customEntity.getEntity();
+			CustomEntitySpawnEvent customSpawnEvent = new CustomEntitySpawnEvent(parameters.location, spawned, customEntity, SpawnReason.COMMAND);
+			Bukkit.getPluginManager().callEvent(customSpawnEvent);
+			if (customSpawnEvent.isCancelled()) {
+				if (spawned != null)
+					spawned.remove();
+				sender.sendMessage(UIFUtils.convertString("&cA third-party plugin prevented the entity from spawning!"));
 				return true;
 			}
 			sender.sendMessage(UIFUtils.convertString("&aSummoned &f"+customEntity.getDisplayName()+" &aat &b"+toSpawn.getBlockX()+' '+toSpawn.getBlockY()+' '+toSpawn.getBlockZ()+(spawnWorld == null ? "" : " &9("+toSpawn.getWorld().getName()+')')));

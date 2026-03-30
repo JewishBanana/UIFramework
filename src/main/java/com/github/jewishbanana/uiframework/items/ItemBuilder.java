@@ -156,12 +156,12 @@ public class ItemBuilder {
 			for (String s : id.getLore())
 				lore.add(s);
 		}
-		if (!base.getFields().isEmpty() && base.getFields().values().stream().anyMatch(e -> e.getLore() != null)) {
+		if (base.fieldLore != null) {
 			if (firstSpace)
 				lore.add(" ");
 			else
 				firstSpace = true;
-			base.getFields().values().stream().filter(e -> e.getLore() != null).forEach(e -> lore.add(e.getLore()));
+			base.fieldLore.values().forEach(line -> lore.add(line));
 		}
 		if (!id.abilityMap.isEmpty() || !base.uniqueAbilities.isEmpty()) {
 			if (firstSpace)

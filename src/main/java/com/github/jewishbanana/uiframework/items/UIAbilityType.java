@@ -142,7 +142,8 @@ public class UIAbilityType {
 	 * @param ticks The amount of ticks to set the cooldown for
 	 */
 	public void putEntityOnCooldown(UUID uuid, int ticks) {
-		cooldown.put(uuid, ticks);
+		if (ticks > 0)
+			cooldown.put(uuid, ticks);
 	}
 	/**
 	 * Get the display name of this ability

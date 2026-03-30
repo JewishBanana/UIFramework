@@ -4,7 +4,6 @@ import java.awt.Color;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -25,6 +24,7 @@ import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.EntityCategory;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.EntityEquipment;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.Damageable;
@@ -223,32 +223,33 @@ public class UIFUtils {
 		return random;
 	}
 	public static Map<GenericItem, ActivatedSlot> getEntityContents(LivingEntity entity) {
-		Map<GenericItem, ActivatedSlot> items = new LinkedHashMap<>();
-		GenericItem mainHand = GenericItem.getItemBase(entity.getEquipment().getItemInMainHand());
+		Map<GenericItem, ActivatedSlot> items = new HashMap<>();
+		EntityEquipment equipment = entity.getEquipment();
+		GenericItem mainHand = GenericItem.getItemBase(equipment.getItemInMainHand());
 		if (mainHand != null)
 			items.put(mainHand, ActivatedSlot.MAIN_HAND);
-		GenericItem offHand = GenericItem.getItemBase(entity.getEquipment().getItemInOffHand());
+		GenericItem offHand = GenericItem.getItemBase(equipment.getItemInOffHand());
 		if (offHand != null)
 			items.put(offHand, ActivatedSlot.OFF_HAND);
-		for (ItemStack stack : entity.getEquipment().getArmorContents()) {
+		for (ItemStack stack : equipment.getArmorContents()) {
 			GenericItem base = GenericItem.getItemBase(stack);
 			if (base != null)
 				items.put(base, ActivatedSlot.ARMOR);
 		}
-		if (entity instanceof Player) {
-			Player player = (Player) entity;
-			for (int i=0; i < 36; i++) {
-				if (i < 9) {
-					GenericItem base = GenericItem.getItemBase(player.getInventory().getContents()[i]);
-					if (base != null)
-						items.putIfAbsent(base, ActivatedSlot.HOTBAR);
-					continue;
-				}
-				GenericItem base = GenericItem.getItemBase(player.getInventory().getContents()[i]);
-				if (base != null)
-					items.put(base, ActivatedSlot.STORAGE);
-			}
-		}
+//		if (entity instanceof Player) {
+//			Player player = (Player) entity;
+//			for (int i=0; i < 36; i++) {
+//				if (i < 9) {
+//					GenericItem base = GenericItem.getItemBase(player.getInventory().getContents()[i]);
+//					if (base != null)
+//						items.putIfAbsent(base, ActivatedSlot.HOTBAR);
+//					continue;
+//				}
+//				GenericItem base = GenericItem.getItemBase(player.getInventory().getContents()[i]);
+//				if (base != null)
+//					items.put(base, ActivatedSlot.STORAGE);
+//			}
+//		}
 		return items;
 	}
 	public static boolean isActivatingSlot(ActivatedSlot test, ActivatedSlot category, ActivatedSlot active, GenericItem base) {

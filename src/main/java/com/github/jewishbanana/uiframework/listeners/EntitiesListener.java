@@ -63,14 +63,12 @@ public class EntitiesListener implements Listener {
 			return;
 		final Location loc = event.getLocation();
 		for (UIEntityManager type : UIEntityManager.getRegistry().values())
-			if (type.getSpawnRate() != 0.0 && random.nextDouble() < type.getSpawnRate() && type.getSpawnConditions().test(event)) {
+			if (type.getSpawnRate() != 0.0 && random.nextFloat() < type.getSpawnRate() && type.getSpawnConditions().test(event)) {
 				CustomEntity<? extends Entity> customClass = UIEntityManager.spawnEntity(loc, type.getEntityClass());
 				Entity entity = customClass.getEntity();
 				if (entity == null)
 					continue;
-				EntitySpawnEvent spawn = new EntitySpawnEvent(entity);
-				if (entity instanceof LivingEntity)
-					spawn = new CreatureSpawnEvent((LivingEntity) entity, SpawnReason.NATURAL);
+				EntitySpawnEvent spawn = entity instanceof LivingEntity living ? new CreatureSpawnEvent(living, SpawnReason.NATURAL) : new EntitySpawnEvent(entity);
 				spawnEvents.add(spawn);
 				Bukkit.getPluginManager().callEvent(spawn);
 				spawnEvents.remove(spawn);

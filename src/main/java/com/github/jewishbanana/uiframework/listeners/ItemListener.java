@@ -45,7 +45,6 @@ import org.bukkit.inventory.AnvilInventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.Recipe;
 import org.bukkit.inventory.RecipeChoice;
-import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.Repairable;
 import org.bukkit.persistence.PersistentDataType;
@@ -71,7 +70,6 @@ public class ItemListener implements Listener {
 	private UIFramework plugin;
 	
 	public Queue<AnvilRecipe> anvilRecipes = new ArrayDeque<>();
-	private NamespacedKey durabilityKey;
 	private Map<AnvilInventory, Integer> anvils = new HashMap<>();
 	
 	private static boolean coloredNames;
@@ -79,11 +77,10 @@ public class ItemListener implements Listener {
 
 	public ItemListener(UIFramework plugin) {
 		this.plugin = plugin;
-		plugin.getServer().getPluginManager().registerEvents(this, plugin);
 		
-		this.durabilityKey = new NamespacedKey(plugin, "uif-d");
+		plugin.getServer().getPluginManager().registerEvents(this, plugin);
 	}
-	@EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+	@EventHandler(ignoreCancelled = true, priority = EventPriority.HIGH)
 	public void onItemClick(InventoryClickEvent event) {
 		if (event.getWhoClicked().getItemOnCursor().getType() == Material.AIR && event.getClickedInventory() != null && anvils.containsKey(event.getClickedInventory()) && event.getRawSlot() == 2) {
 			AnvilInventory inv = (AnvilInventory) event.getClickedInventory();
@@ -132,7 +129,7 @@ public class ItemListener implements Listener {
 				item.refreshItemLore();
 		}
 	}
-	@EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+	@EventHandler(ignoreCancelled = true, priority = EventPriority.HIGH)
 	public void onInventoryOpen(InventoryOpenEvent event) {
 		if (!refreshOnOpen)
 			return;
@@ -143,66 +140,31 @@ public class ItemListener implements Listener {
 					base.refreshItemLore();
 			}
 	}
-	@EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+	@EventHandler(ignoreCancelled = true, priority = EventPriority.MONITOR)
 	public void onInventoryClose(InventoryCloseEvent event) {
 		anvils.remove(event.getInventory());
 	}
-	@EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
+	@EventHandler(ignoreCancelled = true, priority = EventPriority.LOW)
 	public void onItemDamage(PlayerItemDamageEvent event) {
-		ItemStack item = event.getItem();
-		GenericItem base = GenericItem.getItemBase(item);
-		if (base != null && !base.getType().getRegisteredName().equals("_null")) {
-			event.setCancelled(true);
-			if (base.getType().getDurability() < 0)
-				return;
-			ItemMeta itemMeta = item.getItemMeta();
-			double damage = ((((double) item.getType().getMaxDurability()) / (base.getType().getDurability() == 0.0 ? item.getType().getMaxDurability() : base.getType().getDurability())) * ((double) event.getDamage())) + (itemMeta.getPersistentDataContainer().has(durabilityKey, PersistentDataType.DOUBLE) ? itemMeta.getPersistentDataContainer().get(durabilityKey, PersistentDataType.DOUBLE) : 0.0);
-			int realDamage = 0;
-			if (damage >= 1.0) {
-				while (damage >= 1.0) {
-					realDamage++;
-					damage -= 1.0;
-				}
-				Damageable meta = (Damageable) itemMeta;
-				if (meta.getDamage()+realDamage >= item.getType().getMaxDurability()-1) {
-					event.setCancelled(false);
-					return;
-				}
-				meta.setDamage(meta.getDamage()+realDamage);
-			}
-			if (damage > 0)
-				itemMeta.getPersistentDataContainer().set(durabilityKey, PersistentDataType.DOUBLE, damage);
-			item.setItemMeta(itemMeta);
-		}
+	    ItemStack item = event.getItem();
+	    GenericItem base = GenericItem.getItemBase(item);
+	    if (base != null && !base.getType().getRegisteredName().equals("_null")) {
+	        event.setCancelled(true);
+	        if (base.getType().getDurability() < 0)
+	            return;
+	        boolean itemBroke = base.damageItem(event.getDamage(), false, null);
+	        if (itemBroke)
+	            event.setCancelled(false);
+	    }
 	}
-	@EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+	@EventHandler(ignoreCancelled = true, priority = EventPriority.HIGH)
 	public void onItemMend(PlayerItemMendEvent event) {
-		ItemStack item = event.getItem();
-		GenericItem base = GenericItem.getItemBase(item);
-		if (base != null && !base.getType().getRegisteredName().equals("_null")) {
-			event.setCancelled(true);
-			ItemMeta itemMeta = item.getItemMeta();
-			double damage = (itemMeta.getPersistentDataContainer().has(durabilityKey, PersistentDataType.DOUBLE) ? itemMeta.getPersistentDataContainer().get(durabilityKey, PersistentDataType.DOUBLE) : 0.0) - ((((double) item.getType().getMaxDurability()) / (base.getType().getDurability() == 0.0 ? item.getType().getMaxDurability() : base.getType().getDurability())) * ((double) event.getRepairAmount()));
-			int realDamage = 0;
-			if (damage < 0.0) {
-				while (damage < 0.0) {
-					realDamage++;
-					damage += 1.0;
-				}
-				Damageable meta = (Damageable) itemMeta;
-				if (meta.getDamage()-realDamage < 0) {
-					meta.setDamage(0);
-					if (itemMeta.getPersistentDataContainer().has(durabilityKey, PersistentDataType.DOUBLE))
-						itemMeta.getPersistentDataContainer().set(durabilityKey, PersistentDataType.DOUBLE, 0.0);
-					item.setItemMeta(meta);
-					return;
-				}
-				meta.setDamage(meta.getDamage()-realDamage);
-				item.setItemMeta(meta);
-			}
-			if (itemMeta.getPersistentDataContainer().has(durabilityKey, PersistentDataType.DOUBLE))
-				itemMeta.getPersistentDataContainer().set(durabilityKey, PersistentDataType.DOUBLE, damage);
-		}
+	    ItemStack item = event.getItem();
+	    GenericItem base = GenericItem.getItemBase(item);
+	    if (base != null && !base.getType().getRegisteredName().equals("_null")) {
+	        event.setCancelled(true);
+	        base.damageItem(-event.getRepairAmount());
+	    }
 	}
 	@EventHandler(priority = EventPriority.MONITOR)
 	public void onItemBreak(PlayerItemBreakEvent event) {

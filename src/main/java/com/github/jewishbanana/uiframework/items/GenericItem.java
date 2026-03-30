@@ -15,11 +15,18 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
+import javax.annotation.Nullable;
+
+import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Registry;
+import org.bukkit.Sound;
+import org.bukkit.SoundCategory;
+import org.bukkit.World;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.enchantments.Enchantment;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Projectile;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
@@ -38,6 +45,7 @@ import org.bukkit.event.player.PlayerItemConsumeEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
@@ -46,26 +54,33 @@ import com.github.jewishbanana.uiframework.UIFramework;
 import com.github.jewishbanana.uiframework.items.Ability.Action;
 import com.github.jewishbanana.uiframework.listeners.AbilityListener;
 import com.github.jewishbanana.uiframework.utils.UIFUtils;
+import com.github.jewishbanana.uiframework.utils.VersionUtils;
 
 public class GenericItem {
 	
-	private static Map<String, GenericItem> itemMap = new ConcurrentHashMap<>(13335);
+	private static final Map<String, GenericItem> itemMap = new ConcurrentHashMap<>(502);
 	
-	protected static NamespacedKey generalKey;
-	private static NamespacedKey identityKey;
-	private static NamespacedKey defaultsKey;
-	protected static NamespacedKey persistentEnchants;
-	private static NamespacedKey hiddenEnchant;
+	protected static final NamespacedKey generalKey;
+	private static final NamespacedKey identityKey;
+	private static final NamespacedKey defaultsKey;
+	private static final NamespacedKey durabilityKey;
+	protected static final NamespacedKey persistentEnchants;
+	private static final NamespacedKey hiddenEnchant;
 	static {
-		generalKey = new NamespacedKey(UIFramework.getInstance(), "ui-key");
-		identityKey = new NamespacedKey(UIFramework.getInstance(), "uii");
-		defaultsKey = new NamespacedKey(UIFramework.getInstance(), "uie-dkey");
-		persistentEnchants = new NamespacedKey(UIFramework.getInstance(), "uie-nde");
-		hiddenEnchant = new NamespacedKey(UIFramework.getInstance(), "uie-henc");
+		UIFramework plugin = UIFramework.getInstance();
+		
+		generalKey = new NamespacedKey(plugin, "ui-key");
+		identityKey = new NamespacedKey(plugin, "uii");
+		defaultsKey = new NamespacedKey(plugin, "uie-dkey");
+		durabilityKey = new NamespacedKey(plugin, "uif-d");
+		persistentEnchants = new NamespacedKey(plugin, "uie-nde");
+		hiddenEnchant = new NamespacedKey(plugin, "uie-henc");
 	}
+	
 	private UIItemType type;
 	protected ItemStack item;
-	private Map<NamespacedKey, ItemField<?>> fields = new HashMap<>();
+	private Map<String, StoredField<?>> fields = new HashMap<>();
+	protected Map<String, String> fieldLore;
 	protected Set<UIEnchantment> enchants = new HashSet<>();
 	protected Map<Ability, Set<Ability.Action>> uniqueAbilities = new LinkedHashMap<>();
 	
@@ -101,6 +116,8 @@ public class GenericItem {
 				this.enchantment = Registry.ENCHANTMENT.get(NamespacedKey.minecraft(container.get(hiddenEnchant, PersistentDataType.STRING)));
 			ConfigurationSection section = UIFramework.dataFile.getConfigurationSection("itemData."+container.get(identityKey, PersistentDataType.STRING));
 			if (section != null) {
+				if (section.contains("fields"))
+					deserializeFields(section.getConfigurationSection("fields").getValues(false));
 				if (section.contains("abilities"))
 					for (String s : section.getConfigurationSection("abilities").getKeys(false)) {
 						ConfigurationSection temp = section.getConfigurationSection("abilities."+s);
@@ -112,10 +129,10 @@ public class GenericItem {
 								continue;
 							}
 							Ability ability = type.createNewInstance();
-							ability.deserialize(temp.getConfigurationSection("ability").getValues(true));
 							Set<Ability.Action> actions = new HashSet<>();
 							for (String action : temp.getStringList("actions"))
 								actions.add(Ability.Action.valueOf(action));
+							ability.deserialize(temp.getConfigurationSection("ability").getValues(false));
 							uniqueAbilities.put(ability, actions);
 						} catch (Exception e) {
 							e.printStackTrace();
@@ -298,7 +315,6 @@ public class GenericItem {
 	 * @param meta The meta to strip the tags from
 	 */
 	public void stripTags(ItemMeta meta) {
-		fields.values().stream().filter(e -> e.key != null).forEach(e -> meta.getPersistentDataContainer().remove(e.key));
 		PersistentDataContainer container = meta.getPersistentDataContainer();
 		container.remove(identityKey);
 		container.remove(defaultsKey);
@@ -335,7 +351,7 @@ public class GenericItem {
 					UIFramework.consoleSender.sendMessage(UIFUtils.convertString(UIFUtils.prefix+"&cERROR could not initialize custom item '"+key+"'. This is most likely caused by removal of the plugin that created this item before."));
 				return null;
 			}
-			if (itemMap.size() > 10000)
+			if (itemMap.size() > 500)
 				unloadItems();
 			if (uuid == null && item.getType().getMaxStackSize() == 1) {
 				uuid = UUID.randomUUID().toString();
@@ -448,27 +464,111 @@ public class GenericItem {
 		itemMap.forEach((uuid, base) -> {
 			base.enchants.forEach(e -> e.unloadEnchant(base));
 			ItemStack item = base.item;
-			if (item == null || !item.hasItemMeta() || base.uniqueAbilities.isEmpty() || !base.uniqueAbilities.keySet().stream().anyMatch(e -> e.persist))
+			if (item == null || !item.hasItemMeta())
 				return;
 			ConfigurationSection itemSection = section.getConfigurationSection(uuid);
-			if (itemSection == null)
-				itemSection = section.createSection(uuid);
-			ConfigurationSection abilitySection = itemSection.getConfigurationSection("abilities");
-			if (abilitySection != null)
-				itemSection.set("abilities", null);
-			abilitySection = itemSection.createSection("abilities");
-			int i = 0;
-			for (Entry<Ability, Set<Action>> entry : base.uniqueAbilities.entrySet()) {
-				if (!entry.getKey().persist)
-					continue;
-				ConfigurationSection temp = abilitySection.createSection("a"+i);
-				temp.set("actions", new ArrayList<String>(entry.getValue().stream().map(e -> e.toString()).collect(Collectors.toList())));
-				ConfigurationSection created = temp.createSection("ability");
-				entry.getKey().serialize().forEach((k, v) -> created.set(k, v));
-				i++;
+			if (!base.fields.isEmpty() && base.fields.values().stream().anyMatch(e -> e.persists)) {
+				if (itemSection == null)
+					itemSection = section.createSection(uuid);
+				ConfigurationSection fieldsSection = itemSection.getConfigurationSection("fields");
+				if (fieldsSection == null)
+					fieldsSection = itemSection.createSection("fields");
+				for (Entry<String, StoredField<?>> entry : base.fields.entrySet()) {
+					if (!entry.getValue().persists)
+						continue;
+					fieldsSection.set(entry.getKey(), entry.getValue().getValue());
+				}
+			}
+			if (!base.uniqueAbilities.isEmpty() && base.uniqueAbilities.keySet().stream().anyMatch(e -> e.persist)) {
+				if (itemSection == null)
+					itemSection = section.createSection(uuid);
+				ConfigurationSection abilitySection = itemSection.getConfigurationSection("abilities");
+				if (abilitySection != null)
+					itemSection.set("abilities", null);
+				abilitySection = itemSection.createSection("abilities");
+				int i = 0;
+				for (Entry<Ability, Set<Action>> entry : base.uniqueAbilities.entrySet()) {
+					if (!entry.getKey().persist)
+						continue;
+					ConfigurationSection temp = abilitySection.createSection("a"+i);
+					temp.set("actions", new ArrayList<String>(entry.getValue().stream().map(e -> e.toString()).collect(Collectors.toList())));
+					ConfigurationSection created = temp.createSection("ability");
+					entry.getKey().serialize().forEach((k, v) -> created.set(k, v));
+					i++;
+				}
 			}
 		});
 		itemMap.clear();
+	}
+	/**
+	 * Damages or repairs this item with fractional damage tracking.
+	 *
+	 * @param damage The amount of damage (positive) or repair (negative)
+	 * @return true if the item breaks
+	 */
+	public boolean damageItem(double damage) {
+		return damageItem(damage, true, null);
+	}
+	/**
+	 * Damages or repairs this item with fractional damage tracking.
+	 *
+	 * @param damage The amount of damage (positive) or repair (negative)
+	 * @param breakItem If true, automatically breaks the item with vanilla effects
+	 * @param entity The entity that is holding the item, if null will not play sound or particle effects
+	 * @return true if the item should break
+	 */
+	public boolean damageItem(double damage, boolean breakItem, @Nullable Entity entity) {
+		ItemMeta itemMeta = item.getItemMeta();
+		if (itemMeta == null)
+			return false;
+		PersistentDataContainer pdc = itemMeta.getPersistentDataContainer();
+		double baseDurability = getType().getDurability();
+		if (baseDurability == 0.0)
+			baseDurability = item.getType().getMaxDurability();
+		double durabilityRatio = (double) item.getType().getMaxDurability() / baseDurability;
+		// Get current fractional damage and apply new damage
+		double fractionalDamage = pdc.getOrDefault(durabilityKey, PersistentDataType.DOUBLE, 0.0);
+		fractionalDamage += durabilityRatio * damage;
+		// Convert fractional damage to whole damage
+		int wholeDamage = (int) fractionalDamage;
+		fractionalDamage -= wholeDamage; // Keep remainder
+		// Apply whole damage to item
+		if (wholeDamage != 0) {
+			Damageable damageable = (Damageable) itemMeta;
+			int currentDamage = damageable.getDamage();
+			int newDamage = currentDamage + wholeDamage;
+			// Check if item should break
+			if (damage > 0 && newDamage >= item.getType().getMaxDurability() - 1) {
+				if (breakItem) {
+					if (entity != null) {
+						World world = entity.getWorld();
+						Location loc = entity.getLocation().add(0, entity.getHeight() / 2.0, 0);
+						world.playSound(loc, Sound.ENTITY_ITEM_BREAK, SoundCategory.PLAYERS, 1f, 1f);
+						world.spawnParticle(VersionUtils.getItemCrack(), loc, 15, .2, .2, .2, .1, item);
+					}
+					if (item.getAmount() > 1)
+						item.setAmount(item.getAmount() - 1);
+					else {
+						item.setAmount(0);
+						item.setType(Material.AIR);
+					}
+				}
+				return true;
+			}
+			// Clamp to valid range
+			newDamage = Math.max(0, Math.min(newDamage, item.getType().getMaxDurability() - 1));
+			damageable.setDamage(newDamage);
+			// Reset fractional damage if fully repaired
+			if (damage < 0 && newDamage == 0)
+				fractionalDamage = 0.0;
+		}
+		// Store fractional damage (only if > 0)
+		if (fractionalDamage > 0.0)
+			pdc.set(durabilityKey, PersistentDataType.DOUBLE, fractionalDamage);
+		else if (pdc.has(durabilityKey, PersistentDataType.DOUBLE))
+			pdc.remove(durabilityKey);
+		item.setItemMeta(itemMeta);
+		return false;
 	}
 	/**
 	 * Assign a projectile to this item making it the shooter. Will run events from this class when landing/hitting.
@@ -593,30 +693,39 @@ public class GenericItem {
 	public void setItem(ItemStack item) {
 		this.item = item;
 	}
-	public Map<NamespacedKey, ItemField<?>> getFields() {
-		return fields;
+	public void setSpecialLore(String identifier, String lore) {
+		if (fieldLore == null)
+			fieldLore = new HashMap<>();
+		fieldLore.put(identifier, lore);
 	}
-	/**
-	 * Get the ItemField present on this base class from the key.
-	 * 
-	 * @param key The key of the ItemField to get
-	 * @return The ItemField or null
-	 */
-	public ItemField<?> getField(NamespacedKey key) {
-		return fields.get(key);
+	public Collection<String> getSpecialLore() {
+		return fieldLore != null ? fieldLore.values() : null;
 	}
-	/**
-	 * Registers a new item field to the key on this item's base.
-	 * 
-	 * @param key The key of the field to register to this item
-	 * @param dataType The type of data that this key is storing
-	 * @param defaultValue The default value to store on this field if no value was present
-	 * @return The newly created ItemField of your dataType
-	 */
-	public <T> ItemField<T> registerItemField(NamespacedKey key, PersistentDataType<T, T> dataType, T defaultValue) {
-		ItemField<T> field = new ItemField<T>(this, key, dataType, defaultValue);
-		this.fields.put(key, field);
+	public void deserializeFields(Map<String, Object> map) {
+	}
+	@SuppressWarnings("unchecked")
+	public <T> StoredField<T> registerSerializedField(String identifier, Map<String, Object> map, T value, boolean persists) {
+		T stored = (T) map.get(identifier);
+		if (stored != null)
+			return registerField(identifier, stored, true);
+		return registerField(identifier, value, persists);
+	}
+	public <T> StoredField<T> registerSerializedField(String identifier, Map<String, Object> map, T value) {
+		return registerSerializedField(identifier, map, value, false);
+	}
+	public <T> StoredField<T> registerField(String identifier, T value, boolean persists) {
+		StoredField<T> field = new StoredField<T>(value, persists);
+		this.fields.put(identifier, field);
 		return field;
+	}
+	public <T> StoredField<T> registerField(String identifier, T value) {
+		return registerField(identifier, value, false);
+	}
+	public StoredField<?> getField(String identifier) {
+		return fields.get(identifier);
+	}
+	public Map<String, StoredField<?>> getFields() {
+		return fields;
 	}
 	/**
 	 * Get the activating slot that this item must be in for the items events to run.

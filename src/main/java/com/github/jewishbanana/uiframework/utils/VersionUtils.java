@@ -1,24 +1,33 @@
 package com.github.jewishbanana.uiframework.utils;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
+import org.bukkit.Particle;
 import org.bukkit.Registry;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.potion.PotionEffectType;
 
 public class VersionUtils {
 	
-	private static Enchantment sharpness;
-	private static Enchantment smite;
-	private static Enchantment arthropods;
+	private static final Integer[] mcVersion;
 	
-	private static Map<Enchantment, String> enchantNames = new HashMap<>();
+	private static final Enchantment sharpness;
+	private static final Enchantment smite;
+	private static final Enchantment arthropods;
 	
-	private static PotionEffectType strength;
+	private static final Map<Enchantment, String> enchantNames = new HashMap<>();
+	
+	private static final PotionEffectType strength;
+	
+	private static final Particle item_crack;
 	
 	static {
+		mcVersion = Arrays.stream(Bukkit.getBukkitVersion().substring(0, Bukkit.getBukkitVersion().indexOf('-')).split("\\.")).map(e -> Integer.parseInt(e)).toArray(Integer[]::new);
+		
 		sharpness = Registry.ENCHANTMENT.get(NamespacedKey.minecraft("sharpness"));
 		smite = Registry.ENCHANTMENT.get(NamespacedKey.minecraft("smite"));
 		arthropods = Registry.ENCHANTMENT.get(NamespacedKey.minecraft("bane_of_arthropods"));
@@ -47,6 +56,28 @@ public class VersionUtils {
 		});
 		
 		strength = Registry.EFFECT.get(NamespacedKey.minecraft("strength"));
+		
+		if (isMCVersionOrAbove("1.20.5"))
+			item_crack = Particle.ITEM;
+		else
+			item_crack = Particle.valueOf("ITEM_CRACK");
+	}
+	public static boolean isMCVersionOrAbove(String version) {
+		try {
+			String[] test = version.split("\\.");
+			for (int i = 0; i < test.length; i++) {
+	            if (i >= mcVersion.length)
+	                return false;
+	            int testSegment = Integer.parseInt(test[i]);
+	            if (mcVersion[i] > testSegment)
+	                return true;
+	            else if (mcVersion[i] < testSegment)
+	                return false;
+	        }
+	        return true;
+		} catch (NumberFormatException ex) {
+			throw new NumberFormatException("The version string you supplied '"+version+"' is not a valid version string! Format must be as follows: '1.2.3' or '1.2' or '1'!");
+		}
 	}
 	
 	public static Enchantment getSharpness() {
@@ -63,5 +94,8 @@ public class VersionUtils {
 	}
 	public static PotionEffectType getStrength() {
 		return strength;
+	}
+	public static Particle getItemCrack() {
+		return item_crack;
 	}
 }
