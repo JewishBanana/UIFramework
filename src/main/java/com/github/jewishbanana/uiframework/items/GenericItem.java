@@ -701,6 +701,9 @@ public class GenericItem {
 	public Collection<String> getSpecialLore() {
 		return fieldLore != null ? fieldLore.values() : null;
 	}
+	public boolean hasSpecialLore(String identifier) {
+		return fieldLore != null && fieldLore.containsKey(identifier);
+	}
 	public void deserializeFields(Map<String, Object> map) {
 	}
 	@SuppressWarnings("unchecked")

@@ -185,7 +185,7 @@ public class UIFUtils {
 		}
 	}
 	public static ItemStack stripItemTags(GenericItem base) {
-		ItemStack baseItem = base.getItem();
+		ItemStack baseItem = base.getItem().clone();
 		ItemMeta tempMeta = baseItem.getItemMeta();
 		tempMeta.setDisplayName(null);
 		tempMeta.setLore(null);
@@ -209,12 +209,19 @@ public class UIFUtils {
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
         	ItemMeta expectedMeta = expectedClone.getItemMeta();
-        	if (ignoreName)
-            	meta.setDisplayName(expectedMeta.getDisplayName());
-        	else if (!meta.getDisplayName().equals(expectedMeta.getDisplayName()))
+        	if (ignoreName) {
+        		meta.setDisplayName(null);
+        		expectedMeta.setDisplayName(null);
+        	} else if (!meta.getDisplayName().equals(expectedMeta.getDisplayName()))
         		return false;
-        	if (meta instanceof Damageable)
-        		((Damageable) meta).setDamage(((Damageable) expectedMeta).getDamage());
+        	if (meta instanceof Damageable damageable) {
+        		damageable.setDamage(0);
+        		((Damageable) expectedMeta).setDamage(0);
+        	}
+//            ItemStack testFirst = item.clone();
+//            testFirst.setItemMeta(meta);
+//            ItemListener.writeTestToFile("first_slot", new ItemStack[] {testFirst});
+//            ItemListener.writeTestToFile("second_slot", new ItemStack[] {expectedClone});
         	return Bukkit.getItemFactory().equals(meta, expectedMeta);
         }
         return (sample.hasItemMeta() ? Bukkit.getItemFactory().equals(meta, expectedClone.getItemMeta()) : true);
