@@ -15,7 +15,6 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.World;
-import org.bukkit.attribute.Attribute;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -37,6 +36,7 @@ import com.github.jewishbanana.uiframework.listeners.menus.ItemsMenu;
 import com.github.jewishbanana.uiframework.listeners.menus.MenuManager;
 import com.github.jewishbanana.uiframework.listeners.menus.RecipeMenu;
 import com.github.jewishbanana.uiframework.utils.UIFUtils;
+import com.github.jewishbanana.uiframework.utils.VersionUtils;
 import com.mojang.datafixers.util.Pair;
 
 public class UICommand implements CommandExecutor, TabCompleter {
@@ -370,7 +370,7 @@ public class UICommand implements CommandExecutor, TabCompleter {
 						String health = "&f(N/A)";
 						if (e instanceof LivingEntity) {
 							LivingEntity le = (LivingEntity) e;
-							double maxHealth = le.getAttribute(Attribute.GENERIC_MAX_HEALTH).getValue();
+							double maxHealth = le.getAttribute(VersionUtils.getMaxHealthAttribute()).getValue();
 							if (le.getHealth() <= maxHealth / 2.0)
 								health = "&e("+format.format(le.getHealth())+'/'+format.format(maxHealth)+')';
 							else if (le.getHealth() <= maxHealth / 4.0)

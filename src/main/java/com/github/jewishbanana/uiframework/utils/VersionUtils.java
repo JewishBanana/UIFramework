@@ -8,6 +8,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Particle;
 import org.bukkit.Registry;
+import org.bukkit.attribute.Attribute;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.potion.PotionEffectType;
 
@@ -25,8 +26,14 @@ public class VersionUtils {
 	
 	private static final Particle item_crack;
 	
+	private static final Attribute maxHealthAttribute;
+	private static final Attribute attackSpeedAttribute;
+	
 	static {
-		mcVersion = Arrays.stream(Bukkit.getBukkitVersion().substring(0, Bukkit.getBukkitVersion().indexOf('-')).split("\\.")).map(e -> Integer.parseInt(e)).toArray(Integer[]::new);
+		mcVersion = Arrays.stream(Bukkit.getBukkitVersion().split("-")[0].split("\\."))
+				.filter(e -> e.matches("\\d+"))
+				.map(Integer::parseInt)
+				.toArray(Integer[]::new);
 		
 		sharpness = Registry.ENCHANTMENT.get(NamespacedKey.minecraft("sharpness"));
 		smite = Registry.ENCHANTMENT.get(NamespacedKey.minecraft("smite"));
@@ -61,6 +68,14 @@ public class VersionUtils {
 			item_crack = Particle.ITEM;
 		else
 			item_crack = Particle.valueOf("ITEM_CRACK");
+		
+		if (isMCVersionOrAbove("1.21.3")) {
+			maxHealthAttribute = Attribute.MAX_HEALTH;
+		    attackSpeedAttribute = Attribute.ATTACK_SPEED;
+		} else {
+		    maxHealthAttribute = Registry.ATTRIBUTE.get(NamespacedKey.minecraft("generic.max_health"));
+		    attackSpeedAttribute = Registry.ATTRIBUTE.get(NamespacedKey.minecraft("generic.attack_speed"));
+		}
 	}
 	public static boolean isMCVersionOrAbove(String version) {
 		try {
@@ -97,5 +112,11 @@ public class VersionUtils {
 	}
 	public static Particle getItemCrack() {
 		return item_crack;
+	}
+	public static Attribute getMaxHealthAttribute() {
+		return maxHealthAttribute;
+	}
+	public static Attribute getAttackSpeedAttribute() {
+		return attackSpeedAttribute;
 	}
 }

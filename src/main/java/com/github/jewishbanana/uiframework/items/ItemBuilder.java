@@ -252,9 +252,9 @@ public class ItemBuilder {
 			if (id.getAttackSpeed() == 0.0)
 				id.setAttackSpeed(1.0);
 			lore.add(UIFUtils.convertString(UIFramework.getLangString("attributes.attack_speed").replaceAll("%value%", UIFDataUtils.getDecimalFormatted(id.getAttackSpeed()))));
-			if (tempMeta.hasAttributeModifiers() && tempMeta.getAttributeModifiers().containsKey(Attribute.GENERIC_ATTACK_SPEED))
-				tempMeta.removeAttributeModifier(Attribute.GENERIC_ATTACK_SPEED);
-			tempMeta.addAttributeModifier(Attribute.GENERIC_ATTACK_SPEED, new AttributeModifier(attributesUUID, "generic.attackSpeed", id.getAttackSpeed()-4.01, Operation.ADD_NUMBER, EquipmentSlot.HAND));
+			if (tempMeta.hasAttributeModifiers() && tempMeta.getAttributeModifiers().containsKey(VersionUtils.getAttackSpeedAttribute()))
+				tempMeta.removeAttributeModifier(VersionUtils.getAttackSpeedAttribute());
+			tempMeta.addAttributeModifier(VersionUtils.getAttackSpeedAttribute(), new AttributeModifier(attributesUUID, "generic.attackSpeed", id.getAttackSpeed()-4.01, Operation.ADD_NUMBER, EquipmentSlot.HAND));
 		}
 		if (id.getProjectileDamage() != 0.0) {
 			if (firstSpace && !attributeSpacing) {
@@ -366,9 +366,9 @@ public class ItemBuilder {
 			if (id.getAttackSpeed() == 0.0)
 				id.setAttackSpeed(1.0);
 			lore.add(UIFUtils.convertString(UIFramework.getLangString("attributes.attack_speed").replaceAll("%value%", UIFDataUtils.getDecimalFormatted(id.getAttackSpeed()))));
-			if (tempMeta.hasAttributeModifiers() && tempMeta.getAttributeModifiers().containsKey(Attribute.GENERIC_ATTACK_SPEED))
-				tempMeta.removeAttributeModifier(Attribute.GENERIC_ATTACK_SPEED);
-			tempMeta.addAttributeModifier(Attribute.GENERIC_ATTACK_SPEED, new AttributeModifier(attributesUUID, "generic.attackSpeed", id.getAttackSpeed()-4.01, Operation.ADD_NUMBER, EquipmentSlot.HAND));
+			if (tempMeta.hasAttributeModifiers() && tempMeta.getAttributeModifiers().containsKey(VersionUtils.getAttackSpeedAttribute()))
+				tempMeta.removeAttributeModifier(VersionUtils.getAttackSpeedAttribute());
+			tempMeta.addAttributeModifier(VersionUtils.getAttackSpeedAttribute(), new AttributeModifier(attributesUUID, "generic.attackSpeed", id.getAttackSpeed()-4.01, Operation.ADD_NUMBER, EquipmentSlot.HAND));
 		}
 		if (id.getProjectileDamage() != 0.0) {
 			if (firstSpace && !attributeSpacing) {

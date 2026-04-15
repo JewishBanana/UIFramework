@@ -13,7 +13,6 @@ import java.util.function.Predicate;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
-import org.bukkit.attribute.Attribute;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.event.entity.CreatureSpawnEvent;
@@ -22,6 +21,7 @@ import org.bukkit.persistence.PersistentDataType;
 import com.github.jewishbanana.uiframework.UIFramework;
 import com.github.jewishbanana.uiframework.commands.UICommand.UISummonCommandParameters;
 import com.github.jewishbanana.uiframework.utils.UIFUtils;
+import com.github.jewishbanana.uiframework.utils.VersionUtils;
 
 public class UIEntityManager {
 	
@@ -74,7 +74,7 @@ public class UIEntityManager {
 			entity.getPersistentDataContainer().set(key, PersistentDataType.STRING, type.registeredName);
 			if (entity instanceof LivingEntity) {
 				LivingEntity le = (LivingEntity) entity;
-				le.setHealth(le.getAttribute(Attribute.GENERIC_MAX_HEALTH).getValue());
+				le.setHealth(le.getAttribute(VersionUtils.getMaxHealthAttribute()).getValue());
 				boolean despawn = le.getRemoveWhenFarAway();
 				le.setCustomName(customEntity.getDisplayName());
 				le.setRemoveWhenFarAway(despawn);
