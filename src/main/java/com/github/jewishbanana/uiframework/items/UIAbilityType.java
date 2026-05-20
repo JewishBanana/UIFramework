@@ -102,8 +102,11 @@ public class UIAbilityType {
 				Iterator<Entry<UUID, Integer>> it = type.cooldown.entrySet().iterator();
 				while (it.hasNext()) {
 					Entry<UUID, Integer> entry = it.next();
-					if (entry.setValue(entry.getValue() - 1) <= 0)
+					int newVal = entry.getValue() - 1;
+					if (newVal <= 0)
 						it.remove();
+					else
+						entry.setValue(newVal);
 				}
 			}
 		}, 0, 1);

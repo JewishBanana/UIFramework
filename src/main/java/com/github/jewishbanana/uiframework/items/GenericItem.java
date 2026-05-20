@@ -115,9 +115,8 @@ public class GenericItem {
 			if (container.has(hiddenEnchant, PersistentDataType.STRING))
 				this.enchantment = Registry.ENCHANTMENT.get(NamespacedKey.minecraft(container.get(hiddenEnchant, PersistentDataType.STRING)));
 			ConfigurationSection section = UIFramework.dataFile.getConfigurationSection("itemData."+container.get(identityKey, PersistentDataType.STRING));
+			deserializeFields(section != null && section.contains("fields") ? section.getConfigurationSection("fields").getValues(false) : new HashMap<>());
 			if (section != null) {
-				if (section.contains("fields"))
-					deserializeFields(section.getConfigurationSection("fields").getValues(false));
 				if (section.contains("abilities"))
 					for (String s : section.getConfigurationSection("abilities").getKeys(false)) {
 						ConfigurationSection temp = section.getConfigurationSection("abilities."+s);
@@ -706,12 +705,29 @@ public class GenericItem {
 	}
 	public void deserializeFields(Map<String, Object> map) {
 	}
-	@SuppressWarnings("unchecked")
 	public <T> StoredField<T> registerSerializedField(String identifier, Map<String, Object> map, T value, boolean persists) {
-		T stored = (T) map.get(identifier);
+		T stored = coerceSerializedValue(map.get(identifier), value);
 		if (stored != null)
 			return registerField(identifier, stored, true);
 		return registerField(identifier, value, persists);
+	}
+	@SuppressWarnings("unchecked")
+	private <T> T coerceSerializedValue(Object stored, T defaultValue) {
+		if (!(stored instanceof Number number) || defaultValue == null)
+			return (T) stored;
+		if (defaultValue instanceof Byte)
+			return (T) Byte.valueOf(number.byteValue());
+		if (defaultValue instanceof Short)
+			return (T) Short.valueOf(number.shortValue());
+		if (defaultValue instanceof Integer)
+			return (T) Integer.valueOf(number.intValue());
+		if (defaultValue instanceof Long)
+			return (T) Long.valueOf(number.longValue());
+		if (defaultValue instanceof Float)
+			return (T) Float.valueOf(number.floatValue());
+		if (defaultValue instanceof Double)
+			return (T) Double.valueOf(number.doubleValue());
+		return (T) stored;
 	}
 	public <T> StoredField<T> registerSerializedField(String identifier, Map<String, Object> map, T value) {
 		return registerSerializedField(identifier, map, value, false);

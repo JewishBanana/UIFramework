@@ -239,15 +239,32 @@ public class Ability {
 		return map;
 	}
 	public void deserialize(Map<String, Object> map) {
-		cooldownTicks = registerSerializedField("_cooldownTicks", map, 0).getValue();
+		cooldownTicks = registerSerializedField("_cooldownTicks", map, getCooldownTicks()).getValue();
 		activatingSlot = ActivatedSlot.valueOf(registerSerializedField("_activatingSlot", map, getActivatingSlot().toString()).getValue());
 	}
-	@SuppressWarnings("unchecked")
 	public <T> StoredField<T> registerSerializedField(String identifier, Map<String, Object> map, T value, boolean persists) {
-		T stored = (T) map.get(identifier);
+		T stored = coerceSerializedValue(map.get(identifier), value);
 		if (stored != null)
 			return registerField(identifier, stored, true);
 		return registerField(identifier, value, persists);
+	}
+	@SuppressWarnings("unchecked")
+	private <T> T coerceSerializedValue(Object stored, T defaultValue) {
+		if (!(stored instanceof Number number) || defaultValue == null)
+			return (T) stored;
+		if (defaultValue instanceof Byte)
+			return (T) Byte.valueOf(number.byteValue());
+		if (defaultValue instanceof Short)
+			return (T) Short.valueOf(number.shortValue());
+		if (defaultValue instanceof Integer)
+			return (T) Integer.valueOf(number.intValue());
+		if (defaultValue instanceof Long)
+			return (T) Long.valueOf(number.longValue());
+		if (defaultValue instanceof Float)
+			return (T) Float.valueOf(number.floatValue());
+		if (defaultValue instanceof Double)
+			return (T) Double.valueOf(number.doubleValue());
+		return (T) stored;
 	}
 	public <T> StoredField<T> registerSerializedField(String identifier, Map<String, Object> map, T value) {
 		return registerSerializedField(identifier, map, value, false);
@@ -290,6 +307,7 @@ public class Ability {
 	}
 	public void setCooldownTicks(int cooldownTicks) {
 		this.cooldownTicks = cooldownTicks;
+		registerField("_cooldownTicks", cooldownTicks, true);
 	}
 	public ActivatedSlot getActivatingSlot() {
 		return activatingSlot;
