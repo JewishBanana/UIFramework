@@ -27,6 +27,7 @@ public class VersionUtils {
 	private static final Particle item_crack;
 	
 	private static final Attribute maxHealthAttribute;
+	private static final Attribute attackDamageAttribute;
 	private static final Attribute attackSpeedAttribute;
 	
 	static {
@@ -62,20 +63,14 @@ public class VersionUtils {
 			}
 		});
 		
-		strength = Registry.EFFECT.get(NamespacedKey.minecraft("strength"));
+		strength = PotionEffectType.getByName(isMCVersionOrAbove("1.20.5") ? "STRENGTH" : "INCREASE_DAMAGE");
 		
-		if (isMCVersionOrAbove("1.20.5"))
-			item_crack = Particle.ITEM;
-		else
-			item_crack = Particle.valueOf("ITEM_CRACK");
+		item_crack = Particle.valueOf(isMCVersionOrAbove("1.20.5") ? "ITEM" : "ITEM_CRACK");
 		
-		if (isMCVersionOrAbove("1.21.3")) {
-			maxHealthAttribute = Attribute.MAX_HEALTH;
-		    attackSpeedAttribute = Attribute.ATTACK_SPEED;
-		} else {
-		    maxHealthAttribute = Registry.ATTRIBUTE.get(NamespacedKey.minecraft("generic.max_health"));
-		    attackSpeedAttribute = Registry.ATTRIBUTE.get(NamespacedKey.minecraft("generic.attack_speed"));
-		}
+		String attributePrefix = isMCVersionOrAbove("1.21.3") ? "" : "generic.";
+		maxHealthAttribute = Registry.ATTRIBUTE.get(NamespacedKey.minecraft(attributePrefix+"max_health"));
+		attackDamageAttribute = Registry.ATTRIBUTE.get(NamespacedKey.minecraft(attributePrefix+"attack_damage"));
+		attackSpeedAttribute = Registry.ATTRIBUTE.get(NamespacedKey.minecraft(attributePrefix+"attack_speed"));
 	}
 	public static boolean isMCVersionOrAbove(String version) {
 		try {
@@ -115,6 +110,9 @@ public class VersionUtils {
 	}
 	public static Attribute getMaxHealthAttribute() {
 		return maxHealthAttribute;
+	}
+	public static Attribute getAttackDamageAttribute() {
+		return attackDamageAttribute;
 	}
 	public static Attribute getAttackSpeedAttribute() {
 		return attackSpeedAttribute;

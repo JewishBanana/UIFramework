@@ -1,6 +1,7 @@
 package com.github.jewishbanana.uiframework.items;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,9 +29,11 @@ import com.google.common.collect.Multimap;
 
 public class ItemBuilder {
 	
-	private static final UUID attributesUUID;
+	private static final UUID attackDamageUUID;
+	private static final UUID attackSpeedUUID;
 	static {
-		attributesUUID = UUID.fromString("545ff361-b6e6-4531-9c4c-398ef5589a8a");
+		attackSpeedUUID = UUID.fromString("545ff361-b6e6-4531-9c4c-398ef5589a8a");
+		attackDamageUUID = UUID.fromString("545ff361-b6e6-4531-9c4c-398ef5589a8b");
 	}
 	
 	protected UIItemType type;
@@ -143,12 +146,13 @@ public class ItemBuilder {
 	 * 
 	 * @see ItemBuilder#assembleLore()
 	 */
-	@SuppressWarnings("deprecation")
 	public ItemStack assembleLore(ItemStack tempItem, ItemMeta tempMeta, UIItemType id, GenericItem base) {
 		if (base == null)
 			return assembleLore(tempItem, tempMeta, id);
-		if (!id.doesUseLoreFormat())
+		if (!id.doesUseLoreFormat()) {
+			synchronizeCombatAttributes(tempItem);
 			return tempItem;
+		}
 		List<String> lore = new ArrayList<>();
 		boolean firstSpace = false;
 		if (!id.getLore().isEmpty()) {
@@ -252,9 +256,7 @@ public class ItemBuilder {
 			if (id.getAttackSpeed() == 0.0)
 				id.setAttackSpeed(1.0);
 			lore.add(UIFUtils.convertString(UIFramework.getLangString("attributes.attack_speed").replaceAll("%value%", UIFDataUtils.getDecimalFormatted(id.getAttackSpeed()))));
-			if (tempMeta.hasAttributeModifiers() && tempMeta.getAttributeModifiers().containsKey(VersionUtils.getAttackSpeedAttribute()))
-				tempMeta.removeAttributeModifier(VersionUtils.getAttackSpeedAttribute());
-			tempMeta.addAttributeModifier(VersionUtils.getAttackSpeedAttribute(), new AttributeModifier(attributesUUID, "generic.attackSpeed", id.getAttackSpeed()-4.01, Operation.ADD_NUMBER, EquipmentSlot.HAND));
+			applyCombatAttributes(tempMeta);
 		}
 		if (id.getProjectileDamage() != 0.0) {
 			if (firstSpace && !attributeSpacing) {
@@ -296,10 +298,11 @@ public class ItemBuilder {
 	 * 
 	 * @see ItemBuilder#assembleLore()
 	 */
-	@SuppressWarnings("deprecation")
 	public ItemStack assembleLore(ItemStack tempItem, ItemMeta tempMeta, UIItemType id) {
-		if (!id.doesUseLoreFormat())
+		if (!id.doesUseLoreFormat()) {
+			synchronizeCombatAttributes(tempItem);
 			return tempItem;
+		}
 		List<String> lore = new ArrayList<>();
 		boolean firstSpace = false;
 		if (!id.getLore().isEmpty()) {
@@ -366,9 +369,7 @@ public class ItemBuilder {
 			if (id.getAttackSpeed() == 0.0)
 				id.setAttackSpeed(1.0);
 			lore.add(UIFUtils.convertString(UIFramework.getLangString("attributes.attack_speed").replaceAll("%value%", UIFDataUtils.getDecimalFormatted(id.getAttackSpeed()))));
-			if (tempMeta.hasAttributeModifiers() && tempMeta.getAttributeModifiers().containsKey(VersionUtils.getAttackSpeedAttribute()))
-				tempMeta.removeAttributeModifier(VersionUtils.getAttackSpeedAttribute());
-			tempMeta.addAttributeModifier(VersionUtils.getAttackSpeedAttribute(), new AttributeModifier(attributesUUID, "generic.attackSpeed", id.getAttackSpeed()-4.01, Operation.ADD_NUMBER, EquipmentSlot.HAND));
+			applyCombatAttributes(tempMeta);
 		}
 		if (id.getProjectileDamage() != 0.0) {
 			if (firstSpace && !attributeSpacing) {
@@ -397,6 +398,66 @@ public class ItemBuilder {
 		tempMeta.setLore(UIFUtils.chopLore(lore));
 		tempItem.setItemMeta(tempMeta);
 		return tempItem;
+	}
+	public void applyCombatAttributes(ItemMeta meta) {
+		replaceAttributeModifier(meta, VersionUtils.getAttackDamageAttribute(), attackDamageUUID, "generic.attackDamage", getEffectiveDamage(type) - 1.0);
+		replaceAttributeModifier(meta, VersionUtils.getAttackSpeedAttribute(), attackSpeedUUID, "generic.attackSpeed", getEffectiveAttackSpeed(type) - 4.0);
+	}
+	protected boolean synchronizeCombatAttributes(ItemStack item) {
+		if (item == null || !item.hasItemMeta() || hasCurrentCombatAttributes(item.getItemMeta()))
+			return false;
+		ItemMeta meta = item.getItemMeta();
+		if (type.getDamage() != 0.0 || type.getAttackSpeed() != 0.0) {
+			meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
+			applyCombatAttributes(meta);
+		} else {
+			removeAttributeModifier(meta, VersionUtils.getAttackDamageAttribute(), attackDamageUUID);
+			removeAttributeModifier(meta, VersionUtils.getAttackSpeedAttribute(), attackSpeedUUID);
+		}
+		item.setItemMeta(meta);
+		return true;
+	}
+	protected boolean hasCurrentCombatAttributes(ItemMeta meta) {
+		if (type.getDamage() == 0.0 && type.getAttackSpeed() == 0.0)
+			return findAttributeModifier(meta, VersionUtils.getAttackDamageAttribute(), attackDamageUUID) == null
+					&& findAttributeModifier(meta, VersionUtils.getAttackSpeedAttribute(), attackSpeedUUID) == null;
+		AttributeModifier damage = findAttributeModifier(meta, VersionUtils.getAttackDamageAttribute(), attackDamageUUID);
+		AttributeModifier speed = findAttributeModifier(meta, VersionUtils.getAttackSpeedAttribute(), attackSpeedUUID);
+		return damage != null && speed != null
+				&& Math.abs(damage.getAmount() - (getEffectiveDamage(type) - 1.0)) < 0.000001
+				&& Math.abs(speed.getAmount() - (getEffectiveAttackSpeed(type) - 4.0)) < 0.000001;
+	}
+	public double getAppliedAttackDamage(ItemMeta meta) {
+		AttributeModifier modifier = findAttributeModifier(meta, VersionUtils.getAttackDamageAttribute(), attackDamageUUID);
+		return modifier == null ? 1.0 : modifier.getAmount() + 1.0;
+	}
+	protected double getEffectiveDamage(UIItemType type) {
+		return type.getDamage() == 0.0 ? 1.0 : type.getDamage();
+	}
+	protected double getEffectiveAttackSpeed(UIItemType type) {
+		return type.getAttackSpeed() == 0.0 ? 1.0 : type.getAttackSpeed();
+	}
+	@SuppressWarnings("removal")
+	private void replaceAttributeModifier(ItemMeta meta, Attribute attribute, UUID uuid, String name, double amount) {
+		removeAttributeModifier(meta, attribute, uuid);
+		meta.addAttributeModifier(attribute, new AttributeModifier(uuid, name, amount, Operation.ADD_NUMBER, EquipmentSlot.HAND));
+	}
+	@SuppressWarnings("removal")
+	private AttributeModifier findAttributeModifier(ItemMeta meta, Attribute attribute, UUID uuid) {
+		Collection<AttributeModifier> modifiers = meta.getAttributeModifiers(attribute);
+		if (modifiers != null)
+			for (AttributeModifier modifier : modifiers)
+				if (modifier.getUniqueId().equals(uuid))
+					return modifier;
+		return null;
+	}
+	@SuppressWarnings("removal")
+	private void removeAttributeModifier(ItemMeta meta, Attribute attribute, UUID uuid) {
+		Collection<AttributeModifier> modifiers = meta.getAttributeModifiers(attribute);
+		if (modifiers != null)
+			for (AttributeModifier modifier : new ArrayList<>(modifiers))
+				if (modifier.getUniqueId().equals(uuid))
+					meta.removeAttributeModifier(attribute, modifier);
 	}
 	/**
 	 * Directly set the lore of the item. If you are using the {@link #assembleLore()} methods then do not use this as it will just overwrite the default UIFramework lore layout.

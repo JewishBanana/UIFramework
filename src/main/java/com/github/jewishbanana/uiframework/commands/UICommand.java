@@ -21,8 +21,11 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Mob;
 import org.bukkit.entity.Player;
 import org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason;
+import org.bukkit.inventory.EntityEquipment;
+import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 
 import com.github.jewishbanana.uiframework.UIFramework;
@@ -237,6 +240,14 @@ public class UICommand implements CommandExecutor, TabCompleter {
 				}
 				targetToSpawn = (Player) sender;
 				toSpawn = targetToSpawn.getLocation();
+			}
+			if (args.length >= 2 && args[1].equalsIgnoreCase("ui:debug_mob")) {
+				if (toSpawn == null) {
+					sender.sendMessage(UIFUtils.convertString("&cThe debug mob command can only be used by a player!"));
+					return true;
+				}
+				spawnDebugMob(sender, toSpawn, args.length >= 3 ? args[2] : "");
+				return true;
 			}
 			if (args.length < 2) {
 				sender.sendMessage(UIFUtils.convertString("&cUsage: /uiframework summon <entity> [player|x y z] [world]"));
@@ -456,6 +467,8 @@ public class UICommand implements CommandExecutor, TabCompleter {
 			}
 			if (args[0].equalsIgnoreCase("summon") && sender.hasPermission("uiframework.summon")) {
 				list.addAll(UIEntityManager.getRegistry().keySet().stream().filter(e -> e.toLowerCase().contains(keyword)).collect(Collectors.toList()));
+				if ("ui:debug_mob".contains(keyword))
+					list.add("ui:debug_mob");
 				return list;
 			}
 			if (args[0].equalsIgnoreCase("entities") && sender.hasPermission("uiframework.entities")) {
@@ -465,6 +478,8 @@ public class UICommand implements CommandExecutor, TabCompleter {
 		}
 		case 3 -> {
 			keyword = args[2].toLowerCase();
+			if (args[0].equalsIgnoreCase("summon") && args[1].equalsIgnoreCase("ui:debug_mob") && sender.hasPermission("uiframework.summon"))
+				return completeDebugMobParams(args[2]);
 			if ((args[0].equalsIgnoreCase("give") && sender.hasPermission("uiframework.give")) || (args[0].equalsIgnoreCase("summon") && sender.hasPermission("uiframework.summon"))) {
 				list.addAll(Bukkit.getServer().getOnlinePlayers().stream().map(p -> p.getName()).filter(e -> e.toLowerCase().contains(keyword)).collect(Collectors.toList()));
 				return list;
@@ -495,6 +510,150 @@ public class UICommand implements CommandExecutor, TabCompleter {
 		default -> { return list; }
 		}
 		return list;
+	}
+	private static final List<String> DEBUG_PARAM_KEYS = Arrays.asList("type", "hand", "offhand", "helmet", "chest", "legs", "boots");
+
+	private static EquipmentSlot debugSlotForKey(String key) {
+		switch (key) {
+		case "hand": return EquipmentSlot.HAND;
+		case "offhand": return EquipmentSlot.OFF_HAND;
+		case "helmet": return EquipmentSlot.HEAD;
+		case "chest": return EquipmentSlot.CHEST;
+		case "legs": return EquipmentSlot.LEGS;
+		case "boots": return EquipmentSlot.FEET;
+		default: return null;
+		}
+	}
+	/**
+	 * Spawns a testing mob, optionally with a custom or vanilla type and UC items in any equipment slot, parsed from a single
+	 * comma-separated {@code key=value} token (e.g. {@code type=skeleton,hand=uc:ancient_blade,offhand=uc:med_kit|2}). Item
+	 * values accept an optional {@code |amount} stack-size suffix (default 1).
+	 */
+	private void spawnDebugMob(CommandSender sender, Location loc, String params) {
+		org.bukkit.entity.EntityType vanillaType = org.bukkit.entity.EntityType.ZOMBIE;
+		UIEntityManager customType = null;
+		Map<EquipmentSlot, ItemStack> equipment = new HashMap<>();
+		if (params != null && !params.isEmpty())
+			for (String part : params.split(",")) {
+				int eq = part.indexOf('=');
+				if (eq < 0)
+					continue;
+				String key = part.substring(0, eq).toLowerCase();
+				String value = part.substring(eq + 1);
+				if (key.equals("type")) {
+					UIEntityManager ct = UIEntityManager.getEntityType(value);
+					if (ct != null) {
+						customType = ct;
+						vanillaType = null;
+					} else {
+						try {
+							vanillaType = org.bukkit.entity.EntityType.valueOf(value.toUpperCase());
+							customType = null;
+						} catch (IllegalArgumentException ex) {
+							sender.sendMessage(UIFUtils.convertString("&cThere is no entity type '"+value+"'!"));
+							return;
+						}
+					}
+				} else {
+					EquipmentSlot slot = debugSlotForKey(key);
+					if (slot == null)
+						continue;
+					String itemKey = value;
+					int amount = 1;
+					int bar = value.indexOf('|');
+					if (bar >= 0) {
+						itemKey = value.substring(0, bar);
+						try {
+							amount = Math.max(1, Integer.parseInt(value.substring(bar + 1)));
+						} catch (NumberFormatException ex) {
+							amount = 1;
+						}
+					}
+					ItemStack stack;
+					UIItemType itemType = UIItemType.getItemType(itemKey);
+					if (itemType != null)
+						stack = itemType.getItem();
+					else {
+						Material material = Material.matchMaterial(itemKey);
+						if (material == null || material.isAir() || !material.isItem()) {
+							sender.sendMessage(UIFUtils.convertString("&cThere is no item '"+itemKey+"'!"));
+							return;
+						}
+						stack = new ItemStack(material);
+					}
+					stack.setAmount(amount);
+					equipment.put(slot, stack);
+				}
+			}
+		Entity spawned;
+		if (customType != null) {
+			CustomEntity<? extends Entity> ce = UIEntityManager.spawnEntity(loc, customType.getEntityClass());
+			spawned = ce == null ? null : ce.getEntity();
+		} else
+			spawned = loc.getWorld().spawnEntity(loc, vanillaType);
+		if (!(spawned instanceof Mob mob)) {
+			if (spawned != null)
+				spawned.remove();
+			sender.sendMessage(UIFUtils.convertString("&cThat entity type is not a mob!"));
+			return;
+		}
+		EntityEquipment eq = mob.getEquipment();
+		for (Map.Entry<EquipmentSlot, ItemStack> entry : equipment.entrySet()) {
+			eq.setItem(entry.getKey(), entry.getValue());
+			switch (entry.getKey()) {
+			case HAND -> eq.setItemInMainHandDropChance(0f);
+			case OFF_HAND -> eq.setItemInOffHandDropChance(0f);
+			case HEAD -> eq.setHelmetDropChance(0f);
+			case CHEST -> eq.setChestplateDropChance(0f);
+			case LEGS -> eq.setLeggingsDropChance(0f);
+			case FEET -> eq.setBootsDropChance(0f);
+			default -> {}
+			}
+		}
+		mob.setCanPickupItems(false);
+		Location at = mob.getLocation();
+		sender.sendMessage(UIFUtils.convertString("&aSummoned debug mob &f"+mob.getType().name().toLowerCase()+" &aat &b"+at.getBlockX()+' '+at.getBlockY()+' '+at.getBlockZ()));
+	}
+	private List<String> completeDebugMobParams(String arg) {
+		List<String> result = new ArrayList<>();
+		int lastComma = arg.lastIndexOf(',');
+		String prefix = lastComma < 0 ? "" : arg.substring(0, lastComma + 1);
+		String segment = lastComma < 0 ? arg : arg.substring(lastComma + 1);
+		java.util.Set<String> usedKeys = new java.util.HashSet<>();
+		if (!prefix.isEmpty())
+			for (String p : prefix.split(",")) {
+				int eq = p.indexOf('=');
+				if (eq > 0)
+					usedKeys.add(p.substring(0, eq).toLowerCase());
+			}
+		int eq = segment.indexOf('=');
+		if (eq < 0) {
+			String seg = segment.toLowerCase();
+			for (String key : DEBUG_PARAM_KEYS)
+				if (!usedKeys.contains(key) && key.startsWith(seg))
+					result.add(prefix + key + "=");
+		} else {
+			String key = segment.substring(0, eq).toLowerCase();
+			String value = segment.substring(eq + 1).toLowerCase();
+			if (value.indexOf('|') >= 0)
+				return result;
+			if (key.equals("type")) {
+				for (String e : UIEntityManager.getRegistry().keySet())
+					if (e.toLowerCase().contains(value))
+						result.add(prefix + "type=" + e);
+				for (org.bukkit.entity.EntityType et : org.bukkit.entity.EntityType.values())
+					if (et.isSpawnable() && et.isAlive() && et.name().toLowerCase().contains(value))
+						result.add(prefix + "type=" + et.name().toLowerCase());
+			} else if (debugSlotForKey(key) != null) {
+				for (String e : UIItemType.getRegistry().keySet())
+					if (!e.equals("_null") && e.toLowerCase().contains(value))
+						result.add(prefix + key + "=" + e);
+				for (Material material : Material.values())
+					if (!material.isLegacy() && material.isItem() && !material.isAir() && material.name().toLowerCase().contains(value))
+						result.add(prefix + key + "=" + material.name().toLowerCase());
+			}
+		}
+		return result;
 	}
 	public class UISummonCommandParameters {
 		

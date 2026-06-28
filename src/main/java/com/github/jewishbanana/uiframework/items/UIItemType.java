@@ -373,6 +373,29 @@ public class UIItemType {
 			});
 		}
 	}
+	/**
+	 * Fires abilities bound to {@link Action#INTERACT_ENTITY} as a mob's melee hit, since a mob cannot perform a player
+	 * right-click interaction. Routes to {@link Ability#mobHitEntity(EntityDamageByEntityEvent, GenericItem)}.
+	 */
+	public void simulateMobInteractAsHit(EntityDamageByEntityEvent event, GenericItem base, ActivatedSlot slot) {
+		if (!base.uniqueAbilities.isEmpty())
+			base.uniqueAbilities.forEach((k, v) -> {
+				if (v.contains(Action.INTERACT_ENTITY) && UIFUtils.isActivatingSlot(slot, k.getActivatingSlot(), ActivatedSlot.MAIN_HAND, base)) {
+					AbilityTriggerEvent triggerEvent = new AbilityTriggerEvent(k, Action.INTERACT_ENTITY, base, event.getEntity());
+					manager.callEvent(triggerEvent);
+					if (!triggerEvent.isCancelled())
+						triggerEvent.getAbility().mobHitEntity(event, triggerEvent.getBaseItem());
+				}
+			});
+		abilityMap.forEach((k, v) -> {
+			if (v.contains(Action.INTERACT_ENTITY) && UIFUtils.isActivatingSlot(slot, k.getActivatingSlot(), ActivatedSlot.MAIN_HAND, base)) {
+				AbilityTriggerEvent triggerEvent = new AbilityTriggerEvent(k, Action.INTERACT_ENTITY, base, event.getEntity());
+				manager.callEvent(triggerEvent);
+				if (!triggerEvent.isCancelled())
+					triggerEvent.getAbility().mobHitEntity(event, triggerEvent.getBaseItem());
+			}
+		});
+	}
 	public void simulateAction(Action action, ProjectileLaunchEvent event, GenericItem base) {
 		if (!base.uniqueAbilities.isEmpty())
 			base.uniqueAbilities.forEach((k, v) -> {

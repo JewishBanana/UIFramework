@@ -111,6 +111,15 @@ public class Ability {
 	 */
 	public void hitEntity(EntityDamageByEntityEvent event, GenericItem base) {}
 	/**
+	 * Run when a non-player (mob) holder hits an entity with an item whose ability is bound to a player-only entity action
+	 * (e.g. interact-entity) that a mob cannot otherwise perform. Lets the ability treat the mob's melee hit as that interaction.
+	 * Default does nothing.
+	 *
+	 * @param event The damage event involved
+	 * @param base The base class of the firing item
+	 */
+	public void mobHitEntity(EntityDamageByEntityEvent event, GenericItem base) {}
+	/**
 	 * Run whenever an EntityDamageByEntityEvent is fired involving the ability.
 	 * 
 	 * @param event The event involved

@@ -61,6 +61,12 @@ public abstract class CustomEntity<T extends Entity> {
 	}
 	public void onChangeBlock(EntityChangeBlockEvent event) {
 	}
+	/**
+	 * Called one tick after the entity is loaded via {@link UIEntityManager#loadEntity}. Safe to perform AI goal
+	 * changes here since the entity is guaranteed to be in the TICKING state by this point.
+	 */
+	public void postLoad() {
+	}
 	public Entity getEntity() {
 		Entity entity = Bukkit.getEntity(uuid);
 		if (entity == null || !entity.isValid())

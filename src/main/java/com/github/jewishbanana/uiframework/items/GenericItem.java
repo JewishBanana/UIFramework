@@ -337,6 +337,8 @@ public class GenericItem {
 			GenericItem base = itemMap.get(uuid);
 			if (base != null) {
 				base.item = item;
+				if (!base.getType().getBuilder().hasCurrentCombatAttributes(meta))
+					base.refreshItemLore();
 				return base;
 			}
 		}
@@ -967,7 +969,7 @@ public class GenericItem {
 	 * Refresh this base item's lore with the default UIFramework lore format (Will just call the assemble lore function for this base class).
 	 */
 	public void refreshItemLore() {
-		getType().getBuilder().assembleLore(this);
+		getType().getBuilder().assembleLore(this).synchronizeCombatAttributes(item);
 	}
 	public void addPersistentEnchant(UIEnchantment enchant) {
 		if (enchant == null || item == null || !item.hasItemMeta())

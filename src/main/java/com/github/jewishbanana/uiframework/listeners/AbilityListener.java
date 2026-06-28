@@ -2,11 +2,11 @@ package com.github.jewishbanana.uiframework.listeners;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.UUID;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
+import org.bukkit.entity.AbstractArrow;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Projectile;
@@ -20,6 +20,7 @@ import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent.DamageCause;
+import org.bukkit.event.entity.EntityDamageEvent.DamageModifier;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.EntityDropItemEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
@@ -31,11 +32,14 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerItemConsumeEvent;
+import org.bukkit.event.player.PlayerItemHeldEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
+import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.PluginManager;
-import org.bukkit.potion.PotionEffectType;
 
 import com.github.jewishbanana.uiframework.UIFramework;
 import com.github.jewishbanana.uiframework.events.EnchantTriggerEvent;
@@ -43,7 +47,6 @@ import com.github.jewishbanana.uiframework.items.Ability;
 import com.github.jewishbanana.uiframework.items.ActivatedSlot;
 import com.github.jewishbanana.uiframework.items.GenericItem;
 import com.github.jewishbanana.uiframework.utils.UIFUtils;
-import com.github.jewishbanana.uiframework.utils.VersionUtils;
 import com.mojang.datafixers.util.Pair;
 
 public class AbilityListener implements Listener {
@@ -55,6 +58,7 @@ public class AbilityListener implements Listener {
 
 	public AbilityListener(UIFramework plugin) {
 		plugin.getServer().getPluginManager().registerEvents(this, plugin);
+		plugin.getServer().getScheduler().runTask(plugin, () -> plugin.getServer().getOnlinePlayers().forEach(this::refreshHeldCombatItem));
 	}
 	@EventHandler(priority = EventPriority.HIGH)
 	public void onInteract(PlayerInteractEvent event) {
@@ -133,29 +137,6 @@ public class AbilityListener implements Listener {
 		if (event.getDamager() instanceof LivingEntity living) {
 			Map<GenericItem, ActivatedSlot> map = UIFUtils.getEntityContents(living);
 			if (!map.isEmpty()) {
-				GenericItem mainHand = null;
-				for (Entry<GenericItem, ActivatedSlot> entry : map.entrySet())
-					if (entry.getValue() == ActivatedSlot.MAIN_HAND) {
-						mainHand = entry.getKey();
-						break;
-					}
-				if (mainHand != null) {
-					double damage = mainHand.getType().getDamage();
-					if (damage > 0.0 && event.getCause() == DamageCause.ENTITY_ATTACK) {
-						double enchantDamage = UIFUtils.getEnchantDamage(mainHand.getItem(), (event.getEntity() instanceof LivingEntity damaged ? damaged : null));
-						if (living.hasPotionEffect(VersionUtils.getStrength()))
-							damage += living.getPotionEffect(VersionUtils.getStrength()).getAmplifier() * 3.0;
-						if (living instanceof Player player) {
-							double cooldown = player.getAttackCooldown();
-							damage *= 0.2 + ((cooldown * cooldown) * 0.8);
-							damage += (enchantDamage * cooldown);
-						}
-						if (event.getEntity() instanceof LivingEntity && living.getFallDistance() > 0.0 && !living.isOnGround() && !living.isClimbing() && !living.isInWater() && !living.hasPotionEffect(PotionEffectType.BLINDNESS) && !living.hasPotionEffect(PotionEffectType.SLOW_FALLING)
-								&& !living.isInsideVehicle() && !(living instanceof Player player && (player.isSprinting() || player.getAttackCooldown() < 0.9)))
-							damage *= 1.5;
-						event.setDamage(damage);
-					}
-				}
 				map.forEach((k, v) -> {
 					boolean flag = k.isAlwaysAllowAbilities();
 					if (UIFUtils.isActivatingSlot(v, k.getActivatingSlot(), ActivatedSlot.MAIN_HAND, k))
@@ -170,6 +151,10 @@ public class AbilityListener implements Listener {
 					});
 					if (flag)
 						k.getType().simulateAction(Ability.Action.HIT_ENTITY, event, k, v);
+					// A mob cannot right-click an entity, so treat its melee hit as an interact-entity activation for any
+					// abilities the held item binds to that player-only action.
+					if (flag && !(living instanceof Player))
+						k.getType().simulateMobInteractAsHit(event, k, v);
 				});
 			}
 		}
@@ -195,10 +180,97 @@ public class AbilityListener implements Listener {
 				});
 		}
 	}
+	@EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
+	public void refreshMeleeCombatAttributes(EntityDamageByEntityEvent event) {
+		if (event.getCause() != DamageCause.ENTITY_ATTACK || !(event.getDamager() instanceof LivingEntity damager))
+			return;
+		ItemStack heldItem = damager.getEquipment().getItemInMainHand();
+		if (heldItem == null || !heldItem.hasItemMeta())
+			return;
+		ItemMeta preSyncMeta = heldItem.getItemMeta();
+		GenericItem item = GenericItem.getItemBase(heldItem);
+		if (item == null)
+			return;
+		double previousDamage = item.getType().getBuilder().getAppliedAttackDamage(preSyncMeta);
+		double configuredDamage = item.getType().getDamage() == 0.0 ? 1.0 : item.getType().getDamage();
+		if (Math.abs(previousDamage - configuredDamage) < 0.000001)
+			return;
+		double multiplier = 1.0;
+		if (damager instanceof Player player) {
+			double cooldown = player.getAttackCooldown();
+			multiplier = 0.2 + (cooldown * cooldown * 0.8);
+		}
+		if (isCriticalHit(damager))
+			multiplier *= 1.5;
+		event.setDamage(event.getDamage() + ((configuredDamage - previousDamage) * multiplier));
+	}
+	@EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+	@SuppressWarnings("deprecation")
+	public void normalizeNearFullMeleeDamage(EntityDamageByEntityEvent event) {
+		if (event.getCause() != DamageCause.ENTITY_ATTACK || !(event.getDamager() instanceof LivingEntity damager))
+			return;
+		GenericItem item = GenericItem.getItemBase(damager.getEquipment().getItemInMainHand());
+		if (item == null)
+			return;
+		double configuredDamage = item.getType().getDamage();
+		double dealtDamage = event.getDamage();
+		if (configuredDamage > 0.0 && dealtDamage < configuredDamage && dealtDamage >= configuredDamage * 0.98)
+			event.setDamage(configuredDamage);
+		if (event.getEntity() instanceof LivingEntity target && hasNoEquippedArmor(target) && event.isApplicable(DamageModifier.ARMOR))
+			event.setDamage(DamageModifier.ARMOR, 0.0);
+	}
+	private boolean hasNoEquippedArmor(LivingEntity entity) {
+		if (entity.getEquipment() == null)
+			return true;
+		for (ItemStack armor : entity.getEquipment().getArmorContents())
+			if (armor != null && armor.getType() != Material.AIR)
+				return false;
+		return true;
+	}
+	private boolean isCriticalHit(LivingEntity entity) {
+		return entity.getFallDistance() > 0.0 && !entity.isOnGround() && !entity.isClimbing() && !entity.isInWater()
+				&& !entity.hasPotionEffect(org.bukkit.potion.PotionEffectType.BLINDNESS)
+				&& !entity.hasPotionEffect(org.bukkit.potion.PotionEffectType.SLOW_FALLING)
+				&& !entity.isInsideVehicle()
+				&& !(entity instanceof Player player && (player.isSprinting() || player.getAttackCooldown() < 0.9));
+	}
+	@EventHandler
+	public void onPlayerJoin(PlayerJoinEvent event) {
+		refreshHeldCombatItem(event.getPlayer());
+	}
+	@EventHandler
+	public void onHeldItemChange(PlayerItemHeldEvent event) {
+		Bukkit.getScheduler().runTask(UIFramework.getInstance(), () -> refreshHeldCombatItem(event.getPlayer()));
+	}
+	@EventHandler
+	public void onSwapHands(PlayerSwapHandItemsEvent event) {
+		Bukkit.getScheduler().runTask(UIFramework.getInstance(), () -> refreshHeldCombatItem(event.getPlayer()));
+	}
+	private void refreshHeldCombatItem(Player player) {
+		GenericItem item = GenericItem.getItemBase(player.getInventory().getItemInMainHand());
+		if (item != null && (item.getType().getDamage() != 0.0 || item.getType().getAttackSpeed() != 0.0))
+			item.refreshItemLore();
+	}
 	@EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
 	public void onProjectileThrown(ProjectileLaunchEvent event) {
 		if (event.getEntity() instanceof ThrowableProjectile projectile) {
 			GenericItem base = GenericItem.getItemBase(projectile.getItem());
+			if (base != null) {
+				boolean flag = base.projectileThrown(event);
+				base.getEnchants().keySet().forEach(enchant -> {
+					EnchantTriggerEvent enchantTrigger = new EnchantTriggerEvent(enchant, Ability.Action.WAS_THROWN, base, event.getEntity());
+					manager.callEvent(enchantTrigger);
+					if (!enchantTrigger.isCancelled())
+						enchantTrigger.getEnchant().projectileThrown(event, enchantTrigger.getBaseItem());
+				});
+				if (flag)
+					base.getType().simulateAction(Ability.Action.WAS_THROWN, event, base);
+				itemProjectiles.put(event.getEntity().getUniqueId(), Pair.of(null, base));
+			}
+		} else if (event.getEntity() instanceof AbstractArrow arrow && arrow.getItem() != null) {
+			// Thrown tridents (and other custom-item arrows) carry their item via AbstractArrow#getItem(), so a custom one
+			// fires its was-thrown ability the same way a thrown snowball/egg does.
+			GenericItem base = GenericItem.getItemBase(arrow.getItem());
 			if (base != null) {
 				boolean flag = base.projectileThrown(event);
 				base.getEnchants().keySet().forEach(enchant -> {

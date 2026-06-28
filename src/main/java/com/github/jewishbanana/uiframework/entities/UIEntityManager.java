@@ -116,6 +116,8 @@ public class UIEntityManager {
 		try {
 			CustomEntity<? extends Entity> customEntity = type.entityClass.getDeclaredConstructor(type.minecraftEntityType).newInstance(entity);
 			entities.put(entity.getUniqueId(), customEntity);
+			customEntity.scheduleTask(UIFramework.getInstance().getServer().getScheduler().runTask(
+					UIFramework.getInstance(), () -> customEntity.postLoad()));
 		} catch (InstantiationException | IllegalAccessException | IllegalArgumentException | InvocationTargetException
 				| NoSuchMethodException | SecurityException exception) {
 			exception.printStackTrace();

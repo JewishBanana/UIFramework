@@ -4,6 +4,7 @@ author: JewishBanana
 main: ${mainClass}
 description: Framework for custom items.
 api-version: 1.17
+load: STARTUP
 
 commands:
     uiframework:
