@@ -1,8 +1,8 @@
 package com.github.jewishbanana.uiframework.listeners.menus;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.stream.Collectors;
@@ -44,11 +44,12 @@ public class ItemsMenu extends InventoryHandler {
 			if (i < 10 || i >= 35 || (i >= 17 && i <= 18) || (i >= 26 && i <= 27))
 				this.getInventory().setItem(i, whiteGlass);
 		this.getInventory().setItem(4, ItemBuilder.create(Material.CRAFTING_TABLE).registerName(UIFUtils.convertString("&aUltimateItems "+UIFramework.getLangString("menu.recipe"))).setLoreList(Arrays.asList(UIFUtils.convertString(UIFramework.getLangString("menu.recipeInfo")))).build().getItem());
+		List<Entry<String, UIItemType>> itemTypes = UIItemType.getRegistry().entrySet().stream()
+				.filter(entry -> !entry.getKey().equals("_null"))
+				.sorted(Comparator.comparing(entry -> entry.getValue().getItemCategory().getCategoryValue()))
+				.collect(Collectors.toList());
 		int start = (page - 1) * 21, end = page * 21, i = 0, c = 10;
-		for (Entry<String, UIItemType> entry : UIItemType.getRegistry().entrySet().stream().sorted(Comparator.comparing(entry -> entry.getValue().getItemCategory().getCategoryValue()))
-	            .collect(Collectors.toMap(Entry::getKey, Entry::getValue, (e1, e2) -> e1, LinkedHashMap::new)).entrySet()) {
-			if (entry.getKey().equals("_null"))
-				continue;
+		for (Entry<String, UIItemType> entry : itemTypes) {
 			if (i < start) {
 		        i++;
 		        continue;
@@ -60,12 +61,15 @@ public class ItemsMenu extends InventoryHandler {
 			GenericItem base = GenericItem.getItemBaseNoID(entry.getValue().getItem());
 			ItemStack temp = base.stripItemID().getItem();
 			ItemMeta tempMeta = temp.getItemMeta();
-			List<String> lore = tempMeta.getLore();
+			List<String> lore = tempMeta.hasLore() ? new ArrayList<>(tempMeta.getLore()) : new ArrayList<>();
 			lore.addAll(Arrays.asList(" ",
 					categoryTranslation + base.getItemCategory().getDisplayName(),
 					" ",
 					(base.getType().getRecipes().isEmpty() ? ChatColor.RED : ChatColor.GREEN)+UIFramework.getLangString("menu.creationRecipes").replace("%value%", ""+base.getType().getRecipes().size()),
-					(base.getType().getUsedRecipes().isEmpty() ? ChatColor.RED : ChatColor.BLUE)+UIFramework.getLangString("menu.usedRecipes").replace("%value%", ""+base.getType().getUsedRecipes().size())));
+					(base.getType().getUsedRecipes().isEmpty() ? ChatColor.RED : ChatColor.BLUE)+UIFramework.getLangString("menu.usedRecipes").replace("%value%", ""+base.getType().getUsedRecipes().size()),
+					" ",
+					UIFUtils.convertString(UIFramework.getLangString("menu.viewRecipes")),
+					UIFUtils.convertString(UIFramework.getLangString("menu.viewUsedRecipes").replace("&b", "&9"))));
 			if (adminControls)
 				lore.add(UIFUtils.convertString(UIFramework.getLangString("menu.giveItem")));
 			tempMeta.setLore(lore);
@@ -85,7 +89,10 @@ public class ItemsMenu extends InventoryHandler {
 					}
 					return;
 				}
-				RecipeMenu menu = new RecipeMenu(entry.getValue(), base.getDisplayName(), 1, page, adminControls);
+				boolean usedRecipeView = event.getClick() == ClickType.SHIFT_LEFT;
+				if (event.getClick() != ClickType.LEFT && !usedRecipeView)
+					return;
+				RecipeMenu menu = new RecipeMenu(entry.getValue(), base.getDisplayName(), 1, page, adminControls, usedRecipeView);
 				MenuManager.registerInventory(menu.getInventory(), menu);
 				event.getWhoClicked().openInventory(menu.getInventory());
 			}));
@@ -98,7 +105,7 @@ public class ItemsMenu extends InventoryHandler {
 				MenuManager.registerInventory(menu.getInventory(), menu);
 				event.getWhoClicked().openInventory(menu.getInventory());
 			}));
-		if (page < Math.ceil(((double) UIItemType.getRegistry().size()) / 21.0))
+		if (page < Math.ceil(((double) itemTypes.size()) / 21.0))
 			this.addButton(53, new InventoryButton().create(ItemBuilder.create(Material.ARROW).registerName(UIFUtils.convertString(UIFramework.getLangString("menu.page").replace("%number%", (page+1)+""))).build().getItem()).function(event -> {
 				ItemsMenu menu = new ItemsMenu(page+1, adminControls);
 				MenuManager.registerInventory(menu.getInventory(), menu);

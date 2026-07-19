@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
+import org.bukkit.NamespacedKey;
 import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.metadata.FixedMetadataValue;
@@ -26,7 +27,9 @@ import com.github.jewishbanana.uiframework.listeners.ItemListener;
 import com.github.jewishbanana.uiframework.listeners.menus.ItemsMenu;
 import com.github.jewishbanana.uiframework.listeners.menus.MenuManager;
 import com.github.jewishbanana.uiframework.listeners.menus.RecipeMenu;
+import com.github.jewishbanana.uiframework.listeners.BrewingRecipeListener;
 import com.github.jewishbanana.uiframework.utils.AnvilRecipe;
+import com.github.jewishbanana.uiframework.utils.BrewingRecipe;
 import com.github.jewishbanana.uiframework.utils.ConfigUpdater;
 import com.github.jewishbanana.uiframework.utils.Metrics;
 import com.github.jewishbanana.uiframework.utils.UIFDataUtils;
@@ -41,6 +44,7 @@ public class UIFramework extends JavaPlugin {
 	private static Map<JavaPlugin, Runnable> reloadRunnables = new HashMap<>();
 	public static boolean debugMessages;
 	private static ItemListener itemListener;
+	private static BrewingRecipeListener brewingRecipeListener;
 	
 	@SuppressWarnings("deprecation")
 	public void onEnable() {
@@ -107,6 +111,7 @@ public class UIFramework extends JavaPlugin {
 		
 		new AbilityListener(this);
 		itemListener = new ItemListener(this);
+		brewingRecipeListener = new BrewingRecipeListener(this);
 		new MenuManager(this);
 		new EntitiesListener(this);
 		
@@ -202,6 +207,21 @@ public class UIFramework extends JavaPlugin {
 		}
 	}
 	public static void registerAnvilRecipe(AnvilRecipe recipe) {
-		itemListener.anvilRecipes.add(recipe);
+		itemListener.registerAnvilRecipe(recipe);
+	}
+	public static void unregisterAnvilRecipe(NamespacedKey key) {
+		itemListener.unregisterAnvilRecipe(key);
+	}
+	public static AnvilRecipe getAnvilRecipe(NamespacedKey key) {
+		return itemListener.getAnvilRecipe(key);
+	}
+	public static void registerBrewingRecipe(BrewingRecipe recipe) {
+		brewingRecipeListener.register(recipe);
+	}
+	public static void unregisterBrewingRecipe(NamespacedKey key) {
+		brewingRecipeListener.unregister(key);
+	}
+	public static BrewingRecipe getBrewingRecipe(NamespacedKey key) {
+		return brewingRecipeListener.getRecipe(key);
 	}
 }

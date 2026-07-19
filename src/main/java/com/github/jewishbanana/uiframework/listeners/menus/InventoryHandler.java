@@ -6,7 +6,9 @@ import java.util.function.Consumer;
 
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
+import org.bukkit.event.inventory.PrepareAnvilEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
@@ -28,6 +30,10 @@ public abstract class InventoryHandler {
 		InventoryButton button = buttons.get(slot);
 		if (button != null)
 			button.getFunction().accept(event);
+	}
+	public void onDrag(InventoryDragEvent event) {
+	}
+	public void onPrepareAnvil(PrepareAnvilEvent event) {
 	}
 	public void addButton(int slot, InventoryButton button) {
 		this.buttons.put(slot, button);

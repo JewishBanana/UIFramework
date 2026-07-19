@@ -7,7 +7,9 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
+import org.bukkit.event.inventory.PrepareAnvilEvent;
 import org.bukkit.inventory.Inventory;
 
 import com.github.jewishbanana.uiframework.UIFramework;
@@ -39,7 +41,22 @@ public class MenuManager implements Listener {
 		if (handler != null)
 			handler.onClick(e);
 	}
+	@EventHandler
+	public void onDrag(InventoryDragEvent e) {
+		InventoryHandler handler = inventories.get(e.getInventory());
+		if (handler != null)
+			handler.onDrag(e);
+	}
+	@EventHandler
+	public void onPrepareAnvil(PrepareAnvilEvent e) {
+		InventoryHandler handler = inventories.get(e.getView().getTopInventory());
+		if (handler != null)
+			handler.onPrepareAnvil(e);
+	}
 	public static void registerInventory(Inventory inventory, InventoryHandler handler) {
 		inventories.put(inventory, handler);
+	}
+	public static boolean isRegisteredInventory(Inventory inventory) {
+		return inventories.containsKey(inventory);
 	}
 }

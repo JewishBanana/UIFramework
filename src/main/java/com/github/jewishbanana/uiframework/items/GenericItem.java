@@ -398,6 +398,18 @@ public class GenericItem {
 		return null;
 	}
 	/**
+	 * Resolves the registered custom item type without constructing a GenericItem instance.
+	 *
+	 * @param item item whose UIFramework marker should be read
+	 * @return the registered item type, or null for a vanilla/unregistered item
+	 */
+	public static UIItemType getItemType(ItemStack item) {
+		if (item == null || !item.hasItemMeta())
+			return null;
+		String key = item.getItemMeta().getPersistentDataContainer().get(generalKey, PersistentDataType.STRING);
+		return key == null ? null : UIItemType.getItemType(key);
+	}
+	/**
 	 * If you want to create an item base for a vanilla item to add custom abilities or enchants to.
 	 * <p>
 	 * <i>If you are using regular custom items then use the get method below</i>
@@ -440,6 +452,27 @@ public class GenericItem {
 			item.setItemMeta(meta);
 		}
 		return getItemBaseNoID(item);
+	}
+	/**
+	 * Removes the temporary vanilla-item marker added by the create-item-base helpers.
+	 * The returned stack is always a clone and registered custom item IDs are preserved.
+	 *
+	 * @param item The item to copy and clean
+	 * @return A cleaned copy, or null when the supplied item is null
+	 */
+	public static ItemStack cleanRecipeItem(ItemStack item) {
+		if (item == null)
+			return null;
+		ItemStack cleaned = item.clone();
+		ItemMeta meta = cleaned.getItemMeta();
+		if (meta == null)
+			return cleaned;
+		PersistentDataContainer container = meta.getPersistentDataContainer();
+		if ("_null".equals(container.get(generalKey, PersistentDataType.STRING))) {
+			container.remove(generalKey);
+			cleaned.setItemMeta(meta);
+		}
+		return cleaned;
 	}
 	/**
 	 * Remove any item base associated with the ItemStack converting it to a normal item.

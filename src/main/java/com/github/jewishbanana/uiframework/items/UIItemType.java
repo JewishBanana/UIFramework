@@ -41,6 +41,7 @@ import com.github.jewishbanana.uiframework.UIFramework;
 import com.github.jewishbanana.uiframework.events.AbilityTriggerEvent;
 import com.github.jewishbanana.uiframework.items.Ability.Action;
 import com.github.jewishbanana.uiframework.utils.AnvilRecipe;
+import com.github.jewishbanana.uiframework.utils.BrewingRecipe;
 import com.github.jewishbanana.uiframework.utils.UIFDataUtils;
 import com.github.jewishbanana.uiframework.utils.UIFUtils;
 import com.mojang.datafixers.util.Pair;
@@ -199,6 +200,29 @@ public class UIItemType {
 		addRecipe(anvilRecipe);
 	}
 	/**
+	 * Registers an anvil recipe that uses this item without presenting the recipe
+	 * as a way to create this item in the recipe browser.
+	 *
+	 * @param recipe The usage recipe to register
+	 */
+	public void registerUsageRecipe(AnvilRecipe recipe) {
+		if (recipe != null)
+			addRecipe(recipe, false);
+	}
+	/**
+	 * Register a custom brewing stand recipe for this ItemType.
+	 *
+	 * @param recipe The recipe to add
+	 */
+	public void registerRecipe(BrewingRecipe recipe) {
+		if (recipe == null)
+			return;
+		GenericItem base = GenericItem.getItemBaseNoID(builder.getItem());
+		enchants.forEach((k, v) -> k.loadEnchant(base));
+		base.refreshItemLore();
+		addRecipe(new BrewingRecipe(new NamespacedKey(plugin, recipe.getKey().getKey()), recipe.getInput(), recipe.getIngredient(), base.getItem(), recipe.getBrewingTime()));
+	}
+	/**
 	 * Updates this resulting item in all of its crafting recipes. Call this if you modify the item after registration in your plugin
 	 * <p>
 	 * <STRONG>This is automatically handled if the user reloads through UIFramework!</STRONG>
@@ -207,23 +231,37 @@ public class UIItemType {
 		List<Recipe> newList = new ArrayList<>(recipes);
 		recipes.clear();
 		for (Recipe recipe : newList) {
-			plugin.getServer().removeRecipe(((Keyed) recipe).getKey());
+			removeUsedRecipeReferences(recipe);
+			if (recipe instanceof BrewingRecipe)
+				UIFramework.unregisterBrewingRecipe(((Keyed) recipe).getKey());
+			else if (recipe instanceof AnvilRecipe)
+				UIFramework.unregisterAnvilRecipe(((Keyed) recipe).getKey());
+			else
+				plugin.getServer().removeRecipe(((Keyed) recipe).getKey());
 			if (recipe instanceof ShapedRecipe temp)
 				registerRecipe(temp);
 			else if (recipe instanceof ShapelessRecipe temp)
 				registerRecipe(temp);
 			else if (recipe instanceof AnvilRecipe temp)
 				registerRecipe(temp);
+			else if (recipe instanceof BrewingRecipe temp)
+				registerRecipe(temp);
 		}
 	}
 	private <T extends Recipe & Keyed> void addRecipe(T recipe) {
+		addRecipe(recipe, true);
+	}
+	private <T extends Recipe & Keyed> void addRecipe(T recipe, boolean creationRecipe) {
 		if (!registry.containsValue(this))
 			throw new IllegalArgumentException("[UIFramework]: Cannot register recipe because the ItemType is not registered!");
-		if (plugin.getServer().getRecipe(recipe.getKey()) != null)
+		if ((recipe instanceof BrewingRecipe && UIFramework.getBrewingRecipe(recipe.getKey()) != null)
+				|| (recipe instanceof AnvilRecipe && UIFramework.getAnvilRecipe(recipe.getKey()) != null)
+				|| (!(recipe instanceof BrewingRecipe) && !(recipe instanceof AnvilRecipe) && plugin.getServer().getRecipe(recipe.getKey()) != null))
 			return;
 		if (UIFramework.dataFile.contains(this.dataPath+".removed_recipes") && UIFramework.dataFile.getStringList(this.dataPath+".removed_recipes").contains(recipe.getKey().getKey()))
 			return;
-		this.recipes.add(recipe);
+		if (creationRecipe)
+			this.recipes.add(recipe);
 		boolean writeRecipe = true;
 		if (recipe instanceof ShapedRecipe) {
 			((ShapedRecipe) recipe).getChoiceMap().forEach((k, v) -> {
@@ -258,6 +296,20 @@ public class UIItemType {
 			if (anvilRecipe.getResult() == null && !anvilRecipe.isRepair())
 				writeRecipe = false;
 			UIFramework.registerAnvilRecipe(anvilRecipe);
+		} else if (recipe instanceof BrewingRecipe brewingRecipe) {
+			if (brewingRecipe.getInput() instanceof RecipeChoice.ExactChoice exact)
+				exact.getChoices().forEach(item -> {
+					GenericItem tempBase = GenericItem.getItemBaseNoID(item);
+					if (tempBase != null && !tempBase.getType().usedRecipes.contains(recipe))
+						tempBase.getType().usedRecipes.add(recipe);
+				});
+			if (brewingRecipe.getIngredient() instanceof RecipeChoice.ExactChoice exact)
+				exact.getChoices().forEach(item -> {
+					GenericItem tempBase = GenericItem.getItemBaseNoID(item);
+					if (tempBase != null && !tempBase.getType().usedRecipes.contains(recipe))
+						tempBase.getType().usedRecipes.add(recipe);
+				});
+			UIFramework.registerBrewingRecipe(brewingRecipe);
 		}
 		if (writeRecipe && !UIFramework.dataFile.contains(this.dataPath+".recipes."+recipe.getKey().getKey().toString())) {
 			if (!UIFramework.dataFile.contains(this.dataPath+".recipes"))
@@ -893,6 +945,20 @@ public class UIItemType {
 	 */
 	public List<Recipe> getUsedRecipes() {
 		return usedRecipes;
+	}
+	/**
+	 * Adds a recipe to this item's recipe-browser usage list without registering it
+	 * as a server recipe. This is intended for framework-provided mechanics whose
+	 * runtime handling is broader than a single recipe, such as enchanted books.
+	 *
+	 * @param recipe The representative recipe to display
+	 */
+	public void registerUsedRecipe(Recipe recipe) {
+		if (recipe != null && !usedRecipes.contains(recipe))
+			usedRecipes.add(recipe);
+	}
+	public static void removeUsedRecipeReferences(Recipe recipe) {
+		registry.values().forEach(type -> type.usedRecipes.remove(recipe));
 	}
 	/**
 	 * Gets the item category that this items type resides in. Item category is only used to determine the order in which the items will appear in the UI recipes menu, adding categories to your items will help users easily navigate UI menus for your item.

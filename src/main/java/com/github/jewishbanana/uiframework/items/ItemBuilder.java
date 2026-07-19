@@ -444,6 +444,10 @@ public class ItemBuilder {
 	}
 	@SuppressWarnings("removal")
 	private AttributeModifier findAttributeModifier(ItemMeta meta, Attribute attribute, UUID uuid) {
+		// CraftBukkit 1.17.1 throws from getAttributeModifiers(Attribute) when its internal modifier map has never been
+		// initialized. hasAttributeModifiers() handles that state correctly and is available across all supported versions.
+		if (!meta.hasAttributeModifiers())
+			return null;
 		Collection<AttributeModifier> modifiers = meta.getAttributeModifiers(attribute);
 		if (modifiers != null)
 			for (AttributeModifier modifier : modifiers)
@@ -453,6 +457,8 @@ public class ItemBuilder {
 	}
 	@SuppressWarnings("removal")
 	private void removeAttributeModifier(ItemMeta meta, Attribute attribute, UUID uuid) {
+		if (!meta.hasAttributeModifiers())
+			return;
 		Collection<AttributeModifier> modifiers = meta.getAttributeModifiers(attribute);
 		if (modifiers != null)
 			for (AttributeModifier modifier : new ArrayList<>(modifiers))

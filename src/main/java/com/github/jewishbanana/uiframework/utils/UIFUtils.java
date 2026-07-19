@@ -6,6 +6,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -29,6 +30,9 @@ import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.PotionMeta;
+import org.bukkit.potion.PotionData;
+import org.bukkit.potion.PotionType;
 
 import com.github.jewishbanana.uiframework.items.ActivatedSlot;
 import com.github.jewishbanana.uiframework.items.GenericItem;
@@ -196,35 +200,40 @@ public class UIFUtils {
 		return baseItem;
 	}
 	public static boolean isItemSimilar(ItemStack sample, ItemStack expected, boolean ignoreName) {
-		if (sample == null || expected == null || sample.getType() != expected.getType() || sample.hasItemMeta() != expected.hasItemMeta())
-        	return false;
-		ItemStack expectedClone = expected.clone();
-		GenericItem expectedBase = GenericItem.getItemBaseNoID(expected);
+		if (sample == null || expected == null || sample.getType() != expected.getType())
+			return false;
+		ItemStack expectedClone = GenericItem.cleanRecipeItem(expected);
+		GenericItem expectedBase = GenericItem.getItemBaseNoID(expectedClone);
 		if (expectedBase != null)
 			expectedClone = stripItemTags(expectedBase);
-		ItemStack item = sample.clone();
-        GenericItem base = GenericItem.getItemBaseNoID(item);
-        if (base != null)
-        	item = stripItemTags(base);
-        ItemMeta meta = item.getItemMeta();
-        if (meta != null) {
-        	ItemMeta expectedMeta = expectedClone.getItemMeta();
-        	if (ignoreName) {
-        		meta.setDisplayName(null);
-        		expectedMeta.setDisplayName(null);
-        	} else if (!meta.getDisplayName().equals(expectedMeta.getDisplayName()))
-        		return false;
-        	if (meta instanceof Damageable damageable) {
-        		damageable.setDamage(0);
-        		((Damageable) expectedMeta).setDamage(0);
-        	}
-//            ItemStack testFirst = item.clone();
-//            testFirst.setItemMeta(meta);
-//            ItemListener.writeTestToFile("first_slot", new ItemStack[] {testFirst});
-//            ItemListener.writeTestToFile("second_slot", new ItemStack[] {expectedClone});
-        	return Bukkit.getItemFactory().equals(meta, expectedMeta);
-        }
-        return (sample.hasItemMeta() ? Bukkit.getItemFactory().equals(meta, expectedClone.getItemMeta()) : true);
+		ItemStack item = GenericItem.cleanRecipeItem(sample);
+		GenericItem base = GenericItem.getItemBaseNoID(item);
+		if (base != null)
+			item = stripItemTags(base);
+		ItemMeta meta = item.getItemMeta();
+		ItemMeta expectedMeta = expectedClone.getItemMeta();
+		if (meta == null || expectedMeta == null)
+			return meta == null && expectedMeta == null;
+		if (ignoreName) {
+			meta.setDisplayName(null);
+			expectedMeta.setDisplayName(null);
+		}
+		if (meta instanceof Damageable damageable && expectedMeta instanceof Damageable expectedDamageable) {
+			damageable.setDamage(0);
+			expectedDamageable.setDamage(0);
+		}
+		if (meta instanceof PotionMeta potionMeta && expectedMeta instanceof PotionMeta expectedPotionMeta) {
+			PotionData potionData = potionMeta.getBasePotionData();
+			PotionData expectedPotionData = expectedPotionMeta.getBasePotionData();
+			if (!Objects.equals(potionData, expectedPotionData))
+				return false;
+			if (potionData != null) {
+				PotionData neutralPotion = new PotionData(PotionType.WATER);
+				potionMeta.setBasePotionData(neutralPotion);
+				expectedPotionMeta.setBasePotionData(neutralPotion);
+			}
+		}
+		return Bukkit.getItemFactory().equals(meta, expectedMeta);
 	}
 	public static Random getRandom() {
 		return random;

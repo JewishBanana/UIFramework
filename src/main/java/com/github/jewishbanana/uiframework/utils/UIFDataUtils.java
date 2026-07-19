@@ -15,8 +15,12 @@ import org.bukkit.inventory.Recipe;
 import org.bukkit.inventory.RecipeChoice;
 import org.bukkit.inventory.ShapedRecipe;
 import org.bukkit.inventory.ShapelessRecipe;
+import org.bukkit.inventory.meta.PotionMeta;
+import org.bukkit.inventory.meta.SkullMeta;
 
 import com.github.jewishbanana.uiframework.UIFramework;
+import com.github.jewishbanana.uiframework.items.GenericItem;
+import com.github.jewishbanana.uiframework.items.UIItemType;
 import com.github.jewishbanana.uiframework.utils.AnvilRecipe.AnvilChoice;
 import com.github.jewishbanana.uiframework.utils.AnvilRecipe.AnvilChoice.SlotOrder;
 
@@ -100,6 +104,8 @@ public class UIFDataUtils {
 			recipeType = "shapeless";
 		else if (recipe instanceof AnvilRecipe)
 			recipeType = "anvil";
+		else if (recipe instanceof BrewingRecipe)
+			recipeType = "brewing";
 		if (recipeType == null)
 			throw new IllegalArgumentException("[UIFramework]: Cannot write recipe to file because the recipe type "+recipe.getClass().getName()+" is not supported!");
 		section.set("type", recipeType);
@@ -112,7 +118,7 @@ public class UIFDataUtils {
 			shaped.getChoiceMap().forEach((k, v) -> {
 				if (v != null) {
 					if (v instanceof RecipeChoice.ExactChoice)
-						section.set("exact."+k, ((RecipeChoice.ExactChoice) v).getChoices());
+						section.set("exact."+k, cleanExactChoices((RecipeChoice.ExactChoice) v));
 					else
 						section.set("material."+k, ((RecipeChoice.MaterialChoice) v).getChoices().stream().map(e -> e.toString()).collect(Collectors.toList()));
 				}
@@ -120,7 +126,7 @@ public class UIFDataUtils {
 			break;
 		case "shapeless":
 			ShapelessRecipe shapeless = (ShapelessRecipe) recipe;
-			section.set("exact", shapeless.getChoiceList().stream().filter(k -> k instanceof RecipeChoice.ExactChoice).map(k -> ((RecipeChoice.ExactChoice) k).getChoices()).collect(Collectors.toList()));
+			section.set("exact", shapeless.getChoiceList().stream().filter(k -> k instanceof RecipeChoice.ExactChoice).map(k -> cleanExactChoices((RecipeChoice.ExactChoice) k)).collect(Collectors.toList()));
 			section.set("material", shapeless.getChoiceList().stream().filter(k -> k instanceof RecipeChoice.MaterialChoice).map(k -> ((RecipeChoice.MaterialChoice) k).getChoices().stream().map(l -> l.toString()).collect(Collectors.toList())).collect(Collectors.toList()));
 			break;
 		case "anvil":
@@ -130,19 +136,25 @@ public class UIFDataUtils {
 			section.set("repairAmount", anvil.getRepairAmount());
 			if (anvil.getAnvilChoice().getFirstSlot() instanceof RecipeChoice.ExactChoice) {
 				section.set("firstType", "exact");
-				section.set("first", ((RecipeChoice.ExactChoice) anvil.getAnvilChoice().getFirstSlot()).getChoices());
+				section.set("first", cleanExactChoices((RecipeChoice.ExactChoice) anvil.getAnvilChoice().getFirstSlot()));
 			} else {
 				section.set("firstType", "material");
 				section.set("first", ((RecipeChoice.MaterialChoice) anvil.getAnvilChoice().getFirstSlot()).getChoices().stream().map(e -> e.toString()).collect(Collectors.toList()));
 			}
 			if (anvil.getAnvilChoice().getSecondSlot() instanceof RecipeChoice.ExactChoice) {
 				section.set("secondType", "exact");
-				section.set("second", ((RecipeChoice.ExactChoice) anvil.getAnvilChoice().getSecondSlot()).getChoices());
+				section.set("second", cleanExactChoices((RecipeChoice.ExactChoice) anvil.getAnvilChoice().getSecondSlot()));
 			} else {
 				section.set("secondType", "material");
 				section.set("second", ((RecipeChoice.MaterialChoice) anvil.getAnvilChoice().getSecondSlot()).getChoices().stream().map(e -> e.toString()).collect(Collectors.toList()));
 			}
 			section.set("slotOrder", anvil.getAnvilChoice().getSlotOrder().toString());
+			break;
+		case "brewing":
+			BrewingRecipe brewing = (BrewingRecipe) recipe;
+			section.set("brewingTime", brewing.getBrewingTime());
+			writeRecipeChoice(section, "input", brewing.getInput());
+			writeRecipeChoice(section, "ingredient", brewing.getIngredient());
 			break;
 		}
 	}
@@ -157,7 +169,7 @@ public class UIFDataUtils {
 				ShapedRecipe shapedRecipe = new ShapedRecipe(key, result);
 				shapedRecipe.shape(section.getStringList("shape").toArray(new String[0]));
 				for (String s : section.getConfigurationSection("exact").getKeys(false)) {
-					shapedRecipe.setIngredient(s.charAt(0), new RecipeChoice.ExactChoice(((List<ItemStack>) section.get("exact."+s))));
+					shapedRecipe.setIngredient(s.charAt(0), new RecipeChoice.ExactChoice(readExactChoices(section.get("exact."+s))));
 				}
 				for (String s : section.getConfigurationSection("material").getKeys(false))
 					shapedRecipe.setIngredient(s.charAt(0), new RecipeChoice.MaterialChoice(((List<String>) section.get("material."+s)).stream().map(e -> Material.getMaterial(e)).collect(Collectors.toList())));
@@ -165,30 +177,89 @@ public class UIFDataUtils {
 			case "shapeless":
 				ShapelessRecipe shapelessRecipe = new ShapelessRecipe(key, result);
 				for (List<ItemStack> list : ((List<List<ItemStack>>) section.get("exact")))
-					shapelessRecipe.addIngredient(new RecipeChoice.ExactChoice(list));
+					shapelessRecipe.addIngredient(new RecipeChoice.ExactChoice(restoreExactChoices(list)));
 				for (List<String> list : ((List<List<String>>) section.get("material")))
 					shapelessRecipe.addIngredient(new RecipeChoice.MaterialChoice(list.stream().map(k -> Material.getMaterial(k)).collect(Collectors.toList())));
 				return (T) shapelessRecipe;
 			case "anvil":
 				RecipeChoice firstSlot = null;
 				if (section.getString("firstType").equals("exact"))
-					firstSlot = new RecipeChoice.ExactChoice((List<ItemStack>) section.get("first"));
+					firstSlot = new RecipeChoice.ExactChoice(readExactChoices(section.get("first")));
 				else
 					firstSlot = new RecipeChoice.MaterialChoice(section.getStringList("first").stream().map(e -> Material.valueOf(e)).collect(Collectors.toList()));
 				RecipeChoice secondSlot = null;
 				if (section.getString("secondType").equals("exact"))
-					firstSlot = new RecipeChoice.ExactChoice((List<ItemStack>) section.get("second"));
+					secondSlot = new RecipeChoice.ExactChoice(readExactChoices(section.get("second")));
 				else
-					firstSlot = new RecipeChoice.MaterialChoice(section.getStringList("second").stream().map(e -> Material.valueOf(e)).collect(Collectors.toList()));
+					secondSlot = new RecipeChoice.MaterialChoice(section.getStringList("second").stream().map(e -> Material.valueOf(e)).collect(Collectors.toList()));
+				firstSlot = normalizeUserRecipeChoice(key, firstSlot);
+				secondSlot = normalizeUserRecipeChoice(key, secondSlot);
 				if (!section.getBoolean("isRepair"))
-					return (T) new AnvilRecipe(key, new AnvilChoice(firstSlot, secondSlot, SlotOrder.valueOf(section.getString("slotOrder"))), result, section.getInt("levelCost"));
+					return (T) new AnvilRecipe(key, new AnvilChoice(firstSlot, secondSlot,
+							key.getKey().contains("_user_recipe_") ? SlotOrder.MIXED : SlotOrder.valueOf(section.getString("slotOrder"))), result, section.getInt("levelCost"));
 				else
 					return (T) new AnvilRecipe(key, firstSlot, secondSlot, section.getInt("repairAmount"), section.getInt("levelCost"));
+			case "brewing":
+				return (T) new BrewingRecipe(key, normalizeUserRecipeChoice(key, readRecipeChoice(section, "input")),
+						normalizeUserRecipeChoice(key, readRecipeChoice(section, "ingredient")), result,
+						Math.max(1, section.getInt("brewingTime", BrewingRecipe.DEFAULT_BREWING_TIME)));
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
 			UIFramework.consoleSender.sendMessage(UIFUtils.convertString(UIFUtils.prefix+"&cERROR could not read recipe data from &e'"+section+"' &cplease fix this!"));
 			return null;
 		}
+	}
+	private static void writeRecipeChoice(ConfigurationSection section, String path, RecipeChoice choice) {
+		if (choice instanceof RecipeChoice.ExactChoice exact) {
+			section.set(path+"Type", "exact");
+			section.set(path, cleanExactChoices(exact));
+		} else {
+			section.set(path+"Type", "material");
+			section.set(path, ((RecipeChoice.MaterialChoice) choice).getChoices().stream().map(Material::toString).collect(Collectors.toList()));
+		}
+	}
+	private static List<ItemStack> cleanExactChoices(RecipeChoice.ExactChoice exact) {
+		return exact.getChoices().stream().map(UIFDataUtils::cleanExactChoice).collect(Collectors.toList());
+	}
+	private static ItemStack cleanExactChoice(ItemStack item) {
+		ItemStack cleaned = GenericItem.cleanRecipeItem(item);
+		if (cleaned == null || VersionUtils.isMCVersionOrAbove("1.18.1") || cleaned.getType() != Material.PLAYER_HEAD
+				|| GenericItem.getItemType(cleaned) == null)
+			return cleaned;
+		SkullMeta meta = (SkullMeta) cleaned.getItemMeta();
+		meta.setOwningPlayer(null);
+		cleaned.setItemMeta(meta);
+		return cleaned;
+	}
+	@SuppressWarnings("unchecked")
+	private static List<ItemStack> readExactChoices(Object value) {
+		return restoreExactChoices((List<ItemStack>) value);
+	}
+	private static List<ItemStack> restoreExactChoices(List<ItemStack> choices) {
+		return choices.stream().map(item -> {
+			if (VersionUtils.isMCVersionOrAbove("1.18.1") || item.getType() != Material.PLAYER_HEAD)
+				return item;
+			UIItemType type = GenericItem.getItemType(item);
+			if (type == null)
+				return item;
+			ItemStack restored = type.getItem();
+			restored.setAmount(item.getAmount());
+			return restored;
+		}).collect(Collectors.toList());
+	}
+	@SuppressWarnings("unchecked")
+	private static RecipeChoice readRecipeChoice(ConfigurationSection section, String path) {
+		if ("exact".equals(section.getString(path+"Type")))
+			return new RecipeChoice.ExactChoice(readExactChoices(section.get(path)));
+		return new RecipeChoice.MaterialChoice(section.getStringList(path).stream().map(Material::valueOf).collect(Collectors.toList()));
+	}
+	private static RecipeChoice normalizeUserRecipeChoice(NamespacedKey key, RecipeChoice choice) {
+		if (!key.getKey().contains("_user_recipe_") || !(choice instanceof RecipeChoice.ExactChoice exact))
+			return choice;
+		List<ItemStack> choices = exact.getChoices().stream().map(GenericItem::cleanRecipeItem).collect(Collectors.toList());
+		if (choices.stream().anyMatch(item -> GenericItem.getItemBaseNoID(item) != null || item.getItemMeta() instanceof PotionMeta))
+			return new RecipeChoice.ExactChoice(choices);
+		return new RecipeChoice.MaterialChoice(choices.stream().map(ItemStack::getType).distinct().collect(Collectors.toList()));
 	}
 }

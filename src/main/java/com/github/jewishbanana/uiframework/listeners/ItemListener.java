@@ -52,6 +52,7 @@ import org.bukkit.persistence.PersistentDataType;
 import com.github.jewishbanana.uiframework.UIFramework;
 import com.github.jewishbanana.uiframework.items.GenericItem;
 import com.github.jewishbanana.uiframework.items.UIEnchantment;
+import com.github.jewishbanana.uiframework.listeners.menus.MenuManager;
 import com.github.jewishbanana.uiframework.utils.AnvilRecipe;
 import com.github.jewishbanana.uiframework.utils.AnvilRecipe.AnvilChoice;
 import com.github.jewishbanana.uiframework.utils.AnvilRecipe.AnvilChoice.SlotOrder;
@@ -68,7 +69,6 @@ public class ItemListener implements Listener {
 	}
 	
 	private UIFramework plugin;
-	
 	public Queue<AnvilRecipe> anvilRecipes = new ArrayDeque<>();
 	private Map<AnvilInventory, Integer> anvils = new HashMap<>();
 	
@@ -79,6 +79,15 @@ public class ItemListener implements Listener {
 		this.plugin = plugin;
 		
 		plugin.getServer().getPluginManager().registerEvents(this, plugin);
+	}
+	public AnvilRecipe getAnvilRecipe(NamespacedKey key) {
+		return anvilRecipes.stream().filter(recipe -> recipe.getKey().equals(key)).findFirst().orElse(null);
+	}
+	public void registerAnvilRecipe(AnvilRecipe recipe) {
+		anvilRecipes.add(recipe);
+	}
+	public void unregisterAnvilRecipe(NamespacedKey key) {
+		anvilRecipes.removeIf(recipe -> recipe.getKey().equals(key));
 	}
 	@EventHandler(ignoreCancelled = true, priority = EventPriority.HIGH)
 	public void onItemClick(InventoryClickEvent event) {
@@ -271,9 +280,11 @@ public class ItemListener implements Listener {
 				event.getOffers()[i] = null;
 	}
 	@SuppressWarnings("removal")
-	@EventHandler
+	@EventHandler(priority = EventPriority.HIGHEST)
 	public void onAnvilCraft(PrepareAnvilEvent event) {
 		AnvilInventory inv = event.getInventory();
+		if (MenuManager.isRegisteredInventory(event.getView().getTopInventory()))
+			return;
 		ItemStack material = inv.getItem(0);
 		ItemStack ingredient = inv.getItem(1);
 		if (material == null || ingredient == null)
@@ -283,20 +294,22 @@ public class ItemListener implements Listener {
 			if ((isRecipeChoiceValid(anvilChoice.getFirstSlot(), material) && isRecipeChoiceValid(anvilChoice.getSecondSlot(), ingredient))
 					|| (anvilChoice.getSlotOrder() == SlotOrder.MIXED && isRecipeChoiceValid(anvilChoice.getFirstSlot(), ingredient) && isRecipeChoiceValid(anvilChoice.getSecondSlot(), material))) {
 				AnvilResult result = recipe.getAnvilResult(new UIAnvilInventory(event.getInventory()));
-				ItemStack item = result.result;
+				ItemStack item = result.result == null ? null : result.result.clone();
 				if (item == null || item.getType() == Material.AIR)
 					continue;
-				final boolean renameLevel = !inv.getRenameText().equals(ChatColor.stripColor(material.hasItemMeta() ? material.getItemMeta().getDisplayName() : ""));
+				String renameText = inv.getRenameText();
+				final boolean renameLevel = renameText != null && !renameText.equals(ChatColor.stripColor(material.hasItemMeta() ? material.getItemMeta().getDisplayName() : ""));
 				if (renameLevel) {
 					ItemMeta meta = item.getItemMeta();
 					if (coloredNames)
-						meta.setDisplayName(UIFUtils.convertString(inv.getRenameText()));
+						meta.setDisplayName(UIFUtils.convertString(renameText));
 					else
-						meta.setDisplayName(inv.getRenameText());
+						meta.setDisplayName(renameText);
 					item.setItemMeta(meta);
 				}
-				event.setResult(item);
 				final int finalCost = result.levelCost + (renameLevel ? 1 : 0);
+				inv.setRepairCost(finalCost);
+				event.setResult(item);
 				anvils.put(inv, finalCost);
 				plugin.getServer().getScheduler().runTask(plugin, () -> inv.setRepairCost(finalCost));
 				return;
@@ -353,12 +366,13 @@ public class ItemListener implements Listener {
 		base.refreshItemLore();
 		result = base.getItem();
 		ItemMeta meta = result.getItemMeta();
-		final boolean renameLevel = addRepairsFlag && !inv.getRenameText().equals(ChatColor.stripColor(material.hasItemMeta() ? material.getItemMeta().getDisplayName() : ""));
+		String renameText = inv.getRenameText();
+		final boolean renameLevel = addRepairsFlag && renameText != null && !renameText.equals(ChatColor.stripColor(material.hasItemMeta() ? material.getItemMeta().getDisplayName() : ""));
 		if (renameLevel) {
 			if (coloredNames)
-				meta.setDisplayName(UIFUtils.convertString(inv.getRenameText()));
+				meta.setDisplayName(UIFUtils.convertString(renameText));
 			else
-				meta.setDisplayName(inv.getRenameText());
+				meta.setDisplayName(renameText);
 		}
 		attachRecipeMetaFix(meta);
 		result.setItemMeta(meta);

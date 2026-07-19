@@ -7,6 +7,7 @@ import java.util.Map;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
+import org.bukkit.entity.HumanEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryClickEvent;
@@ -17,11 +18,17 @@ import org.bukkit.inventory.Recipe;
 import org.bukkit.inventory.RecipeChoice;
 import org.bukkit.inventory.ShapedRecipe;
 import org.bukkit.inventory.ShapelessRecipe;
+import org.bukkit.inventory.meta.PotionMeta;
 
 import com.github.jewishbanana.uiframework.UIFramework;
 import com.github.jewishbanana.uiframework.items.GenericItem;
 import com.github.jewishbanana.uiframework.items.ItemBuilder;
 import com.github.jewishbanana.uiframework.items.UIItemType;
+import com.github.jewishbanana.uiframework.utils.AnvilRecipe;
+import com.github.jewishbanana.uiframework.utils.AnvilRecipe.AnvilChoice;
+import com.github.jewishbanana.uiframework.utils.AnvilRecipe.AnvilChoice.SlotOrder;
+import com.github.jewishbanana.uiframework.utils.BrewingRecipe;
+import com.github.jewishbanana.uiframework.utils.UIFDataUtils;
 import com.github.jewishbanana.uiframework.utils.UIFUtils;
 
 public class RecipeCreateMenu extends InventoryHandler {
@@ -36,6 +43,9 @@ public class RecipeCreateMenu extends InventoryHandler {
 	public RecipeMenu returnMenu;
 	private RecipeCreateMenu returnRecipeMenu;
 	private Recipe recipe;
+	private NamespacedKey recipeKey;
+	private int brewingTime = BrewingRecipe.DEFAULT_BREWING_TIME;
+	private int anvilLevelCost = 1;
 	
 	public RecipeCreateMenu(UIItemType type, String itemDisplayName, String recipeType, RecipeMenu returnMenu) {
 		this.type = type;
@@ -75,6 +85,16 @@ public class RecipeCreateMenu extends InventoryHandler {
 				MenuManager.registerInventory(menu.getInventory(), menu);
 				event.getWhoClicked().openInventory(menu.getInventory());
 			}));
+			this.addButton(12, new InventoryButton().create(ItemBuilder.create(Material.BREWING_STAND).registerName(UIFUtils.convertString("&6"+UIFramework.getLangString("menu.brewingRecipe"))).build().getItem()).function(event -> {
+				RecipeCreateMenu menu = new RecipeCreateMenu(type, itemDisplayName, "brewing", this);
+				MenuManager.registerInventory(menu.getInventory(), menu);
+				event.getWhoClicked().openInventory(menu.getInventory());
+			}));
+			this.addButton(13, new InventoryButton().create(ItemBuilder.create(Material.ANVIL).registerName(UIFUtils.convertString("&7"+UIFramework.getLangString("menu.anvilRecipe"))).build().getItem()).function(event -> {
+				RecipeCreateMenu menu = new RecipeCreateMenu(type, itemDisplayName, "anvil", this);
+				MenuManager.registerInventory(menu.getInventory(), menu);
+				event.getWhoClicked().openInventory(menu.getInventory());
+			}));
 		} else {
 			ItemStack air = new ItemStack(Material.AIR);
 			String key = null;
@@ -85,14 +105,15 @@ public class RecipeCreateMenu extends InventoryHandler {
 				}
 			if (key == null)
 				throw new IllegalArgumentException("[UltimateItems]: Cannot create recipe for '"+type.getRegisteredName()+"' as there is no default available namespace!");
+			recipeKey = new NamespacedKey(plugin, key);
 			for (int i=0; i < 45; i++)
 				this.getInventory().setItem(i, whiteGlass);
 			switch (recipeType) {
 			case "shaped":
-				recipe = new ShapedRecipe(new NamespacedKey(plugin, key), type.getItem());
+				recipe = new ShapedRecipe(recipeKey, type.getItem());
 			case "shapeless":
 				if (recipe == null)
-					recipe = new ShapelessRecipe(new NamespacedKey(plugin, key), type.getItem());
+					recipe = new ShapelessRecipe(recipeKey, type.getItem());
 				for (int i=0; i < 45; i++)
 					if (i % 9 < 5)
 						this.getInventory().setItem(i, greenGlass);
@@ -103,6 +124,49 @@ public class RecipeCreateMenu extends InventoryHandler {
 					int slot = 10+(i == 1 ? 0 : ((i-1)/3)*9)+((i-1) % 3);
 					this.getInventory().setItem(slot, air);
 				}
+				break;
+			case "brewing":
+				for (int i=9; i < 45; i++)
+					if (i % 9 < 8 && i % 9 > 0)
+						this.getInventory().setItem(i, greenGlass);
+				for (int slot=1; slot <= 5; slot++)
+					this.getInventory().setItem(slot, greenGlass);
+				for (int slot : new int[] {15, 16, 33, 34, 42, 43})
+					this.getInventory().setItem(slot, whiteGlass);
+				this.getInventory().setItem(11, createLabelGlass(Material.YELLOW_STAINED_GLASS_PANE, "menu.brewingIngredientLeft"));
+				this.getInventory().setItem(12, air);
+				this.getInventory().setItem(13, createLabelGlass(Material.YELLOW_STAINED_GLASS_PANE, "menu.brewingIngredientRight"));
+				this.getInventory().setItem(21, greenGlass);
+				this.getInventory().setItem(29, createLabelGlass(Material.BLUE_STAINED_GLASS_PANE, "menu.brewingPotionLeft"));
+				this.getInventory().setItem(30, air);
+				this.getInventory().setItem(31, createLabelGlass(Material.BLUE_STAINED_GLASS_PANE, "menu.brewingPotionRight"));
+				this.getInventory().setItem(25, type.getItem());
+				this.addButton(39, new InventoryButton().create(createBrewingTimeItem()).function(event -> {
+					int change = event.isShiftClick() ? 100 : 20;
+					if (event.isLeftClick())
+						brewingTime = Math.min(12000, brewingTime + change);
+					else if (event.isRightClick())
+						brewingTime = Math.max(20, brewingTime - change);
+					event.getInventory().setItem(39, createBrewingTimeItem());
+				}));
+				break;
+			case "anvil":
+				for (int i=9; i < 33; i++)
+					if (i % 9 < 6 && i % 9 > 0)
+						this.getInventory().setItem(i, greenGlass);
+				this.getInventory().setItem(20, air);
+				this.getInventory().setItem(21, ItemBuilder.create(Material.NETHER_STAR).registerName(UIFUtils.convertString(UIFramework.getLangString("menu.combined"))).build().getItem());
+				this.getInventory().setItem(22, air);
+				this.getInventory().setItem(24, greenGlass);
+				this.getInventory().setItem(25, type.getItem());
+				this.addButton(30, new InventoryButton().create(createAnvilCostItem()).function(event -> {
+					int change = event.isShiftClick() ? 5 : 1;
+					if (event.isLeftClick())
+						anvilLevelCost = Math.min(39, anvilLevelCost + change);
+					else if (event.isRightClick())
+						anvilLevelCost = Math.max(0, anvilLevelCost - change);
+					event.getInventory().setItem(30, createAnvilCostItem());
+				}));
 				break;
 			}
 			this.addButton(45, new InventoryButton().create(ItemBuilder.create(Material.PAPER).registerName(UIFUtils.convertString(UIFramework.getLangString("menu.returnRecipe"))).build().getItem()).function(event -> {
@@ -153,6 +217,24 @@ public class RecipeCreateMenu extends InventoryHandler {
 						event.getWhoClicked().openInventory(menu.getInventory());
 						return;
 					}
+				} else if ("brewing".equals(recipeType)) {
+					ItemStack input = this.getInventory().getItem(30);
+					ItemStack ingredient = this.getInventory().getItem(12);
+					if (isPresent(input) && isPresent(ingredient)) {
+						type.registerRecipe(new BrewingRecipe(recipeKey, createRecipeChoice(input),
+								createRecipeChoice(ingredient), type.getItem(), brewingTime));
+						openCreatedRecipe(event.getWhoClicked());
+						return;
+					}
+				} else if ("anvil".equals(recipeType)) {
+					ItemStack first = this.getInventory().getItem(20);
+					ItemStack second = this.getInventory().getItem(22);
+					if (isPresent(first) && isPresent(second)) {
+						type.registerRecipe(new AnvilRecipe(recipeKey, new AnvilChoice(createRecipeChoice(first),
+								createRecipeChoice(second), SlotOrder.MIXED), type.getItem(), anvilLevelCost));
+						openCreatedRecipe(event.getWhoClicked());
+						return;
+					}
 				}
 				MenuManager.registerInventory(returnRecipeMenu.returnMenu.getInventory(), returnRecipeMenu.returnMenu);
 				event.getWhoClicked().openInventory(returnRecipeMenu.returnMenu.getInventory());
@@ -161,10 +243,44 @@ public class RecipeCreateMenu extends InventoryHandler {
 		super.decorate();
 	}
 	private ItemStack stripAndCopy(ItemStack item) {
-		GenericItem base = GenericItem.getItemBaseNoID(item.clone());
+		ItemStack cleaned = GenericItem.cleanRecipeItem(item);
+		GenericItem base = GenericItem.getItemBaseNoID(cleaned);
 		if (base == null)
-			return item;
+			return cleaned;
 		return UIFUtils.stripItemTags(base);
+	}
+	private RecipeChoice createRecipeChoice(ItemStack item) {
+		ItemStack cleaned = GenericItem.cleanRecipeItem(item);
+		if (GenericItem.getItemBaseNoID(cleaned) != null || cleaned.getItemMeta() instanceof PotionMeta)
+			return new RecipeChoice.ExactChoice(stripAndCopy(cleaned));
+		return new RecipeChoice.MaterialChoice(cleaned.getType());
+	}
+	private ItemStack createBrewingTimeItem() {
+		ItemStack item = ItemBuilder.create(Material.CLOCK)
+				.registerName(UIFUtils.convertString(UIFramework.getLangString("menu.brewingTime").replace("%seconds%", UIFDataUtils.getDecimalFormatted(brewingTime / 20.0))))
+				.setLoreList(Arrays.asList(UIFUtils.convertString(UIFramework.getLangString("menu.adjustRecipeValue")), UIFUtils.convertString(UIFramework.getLangString("menu.adjustRecipeValueShift"))))
+				.build().getItem();
+		item.setAmount(Math.min(64, Math.max(1, brewingTime / 20)));
+		return item;
+	}
+	private ItemStack createLabelGlass(Material material, String languageKey) {
+		return ItemBuilder.create(material).registerName(UIFUtils.convertString(UIFramework.getLangString(languageKey))).build().getItem();
+	}
+	private ItemStack createAnvilCostItem() {
+		ItemStack item = ItemBuilder.create(Material.EXPERIENCE_BOTTLE)
+				.registerName(UIFUtils.convertString(UIFramework.getLangString("menu.anvilLevelCost").replace("%levels%", Integer.toString(anvilLevelCost))))
+				.setLoreList(Arrays.asList(UIFUtils.convertString(UIFramework.getLangString("menu.adjustRecipeValue")), UIFUtils.convertString(UIFramework.getLangString("menu.adjustRecipeValueShift"))))
+				.build().getItem();
+		item.setAmount(Math.max(1, anvilLevelCost));
+		return item;
+	}
+	private void openCreatedRecipe(HumanEntity player) {
+		RecipeMenu menu = new RecipeMenu(type, itemDisplayName, type.getRecipes().size(), returnRecipeMenu.returnMenu.memoryPage, returnRecipeMenu.returnMenu.adminControls);
+		MenuManager.registerInventory(menu.getInventory(), menu);
+		player.openInventory(menu.getInventory());
+	}
+	private static boolean isPresent(ItemStack item) {
+		return item != null && item.getType() != Material.AIR;
 	}
 	public void onClick(InventoryClickEvent event) {
 		int slot = event.getRawSlot();
@@ -191,6 +307,14 @@ public class RecipeCreateMenu extends InventoryHandler {
 					event.setCancelled(true);
 				}
 				break;
+			case "brewing":
+				if (slot == 12 || slot == 30)
+					event.setCancelled(false);
+				break;
+			case "anvil":
+				if (slot == 20 || slot == 22)
+					event.setCancelled(false);
+				break;
 			}
 	}
 	public void onClose(InventoryCloseEvent e) {
@@ -212,7 +336,24 @@ public class RecipeCreateMenu extends InventoryHandler {
 					}
 				}
 				break;
+			case "brewing":
+				returnItems(p, 12, 30);
+				break;
+			case "anvil":
+				returnItems(p, 20, 22);
+				break;
 			}
+		}
+	}
+	private void returnItems(Player player, int... slots) {
+		for (int slot : slots) {
+			ItemStack item = this.getInventory().getItem(slot);
+			if (!isPresent(item))
+				continue;
+			if (player.getInventory().firstEmpty() == -1)
+				player.getWorld().dropItem(player.getLocation(), item);
+			else
+				player.getInventory().addItem(item);
 		}
 	}
 	@Override
