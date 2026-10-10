@@ -22,6 +22,7 @@ import com.github.jewishbanana.uiframework.UIFramework;
 import com.github.jewishbanana.uiframework.commands.UICommand.UISummonCommandParameters;
 import com.github.jewishbanana.uiframework.utils.UIFUtils;
 import com.github.jewishbanana.uiframework.utils.VersionUtils;
+import com.github.jewishbanana.uiframework.utils.EntitySpawnCompatibility;
 
 public class UIEntityManager {
 	
@@ -46,7 +47,7 @@ public class UIEntityManager {
 		this.registeredName = registeredName;
 		this.minecraftEntityType = resolveEntityClass(entityClass);
 		this.spawnConditions = e -> true;
-		this.entityCreator = location -> location.getWorld().spawn(location, minecraftEntityType, randomizeData, null);
+		this.entityCreator = location -> EntitySpawnCompatibility.spawn(location, minecraftEntityType, randomizeData);
 	}
 	@SuppressWarnings("unchecked")
 	private static Class<? extends Entity> resolveEntityClass(Class<? extends CustomEntity<? extends Entity>> clazz) {
